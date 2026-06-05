@@ -1,0 +1,8 @@
+{
+  "ignore": [
+    "db.json",
+    "public/uploads/*",
+    "temp/*",
+    "node_modules/*"
+  ]
+}
