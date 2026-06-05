@@ -2,8 +2,7 @@ import { useContext, useState, useEffect, useRef } from "react";
 import { PlayerContext } from "../context/PlayerContext";
 import { Search as SearchIcon, X, Clock, Play, Pause, ListMusic, Check, Loader2 } from "lucide-react";
 import axios from "axios";
-
-const BACKEND_URL = "http://localhost:5000"; 
+import API_URL from "../config/api";
 
 const Search = () => {
   const { currentSong, playStatus, playTrackDirectly, togglePlay, createPlaylist, searchQuery, setSearchQuery } = useContext(PlayerContext);
@@ -26,7 +25,7 @@ const Search = () => {
       if (searchQuery.trim()) {
         setLoading(true);
         try {
-          const res = await axios.get(`${BACKEND_URL}/api/saavn/search?query=${encodeURIComponent(searchQuery)}`);
+          const res = await axios.get(`${API_URL}/api/saavn/search?query=${encodeURIComponent(searchQuery)}`);
           if (res.data.success) {
             setSearchResults(res.data.data || []);
           }
@@ -136,7 +135,7 @@ const Search = () => {
       setImportProgress(prev => ({ ...prev, current: i + 1, query: queryStr }));
 
       try {
-        const res = await axios.get(`${BACKEND_URL}/api/saavn/search?query=${encodeURIComponent(queryStr)}`);
+        const res = await axios.get(`${API_URL}/api/saavn/search?query=${encodeURIComponent(queryStr)}`);
         if (res.data.success && res.data.data.length > 0) {
           resolved.push({
             checked: true,

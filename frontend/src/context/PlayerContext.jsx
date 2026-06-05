@@ -1,9 +1,8 @@
 import { createContext, useEffect, useRef, useState } from "react";
 import axios from "axios";
+import API_URL from "../config/api";
 
 export const PlayerContext = createContext();
-
-const API_URL = "http://localhost:5000";
 
 const extractDominantColor = (imageUrl) => {
   return new Promise((resolve) => {

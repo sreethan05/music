@@ -38,10 +38,14 @@ const allowedOrigins = [
   process.env.CLIENT_URL
 ].filter(Boolean);
 
+const isDevelopmentOrigin = (origin) => {
+  if (process.env.NODE_ENV === 'production') return false;
+  return /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+|192\.168\.\d+\.\d+)(:\d+)?$/.test(origin);
+};
+
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow if matches allowedOrigins list, or if it is any localhost/127.0.0.1 development port
-    if (!origin || allowedOrigins.includes(origin) || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+    if (!origin || allowedOrigins.includes(origin) || isDevelopmentOrigin(origin)) {
       callback(null, true);
     } else {
       callback(new Error(`CORS policy blocked access from origin: ${origin}`));

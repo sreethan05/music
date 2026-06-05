@@ -1,6 +1,7 @@
 import { useState, useContext } from "react";
 import axios from "axios";
 import { PlayerContext } from "../context/PlayerContext";
+import API_URL from "../config/api";
 import { 
   Music, 
   ListMusic, 
@@ -14,8 +15,6 @@ import {
   Database,
   Disc
 } from "lucide-react";
-
-const API_URL = "http://localhost:5000";
 
 const AdminDashboard = () => {
   const { songsData, albumsData, refreshLibrary, token } = useContext(PlayerContext);
