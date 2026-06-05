@@ -45,6 +45,10 @@ export const uploadFile = async (file, resourceType = 'auto') => {
 
   fs.renameSync(file.path, targetPath);
   
-  const publicUrl = process.env.API_PUBLIC_URL || `http://localhost:${process.env.PORT || 5000}`;
-  return `${publicUrl.replace(/\/$/, '')}/uploads/${fileName}`;
+  const publicUrl = process.env.API_PUBLIC_URL;
+  if (publicUrl) {
+    return `${publicUrl.replace(/\/$/, '')}/uploads/${fileName}`;
+  }
+
+  return `/uploads/${fileName}`;
 };

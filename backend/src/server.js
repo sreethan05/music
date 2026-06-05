@@ -3,6 +3,7 @@ import cors from 'cors';
 import 'dotenv/config';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 import helmet from 'helmet';
 import mongoSanitize from 'express-mongo-sanitize';
 import rateLimit from 'express-rate-limit';
@@ -16,6 +17,12 @@ import { getAlbums, getSongs, createAlbum, createSong } from './services/dbServi
 
 const app = express();
 const port = process.env.PORT || 5000;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const backendRoot = path.resolve(__dirname, '..');
+const repoRoot = path.resolve(backendRoot, '..');
+const frontendDistDir = path.join(repoRoot, 'frontend', 'dist');
+app.set('trust proxy', 1);
 
 // Connect to MongoDB if config exists
 connectDB();
@@ -43,15 +50,25 @@ const isDevelopmentOrigin = (origin) => {
   return /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+|192\.168\.\d+\.\d+)(:\d+)?$/.test(origin);
 };
 
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin) || isDevelopmentOrigin(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error(`CORS policy blocked access from origin: ${origin}`));
-    }
-  },
-  credentials: true
+const isSameHostOrigin = (origin, host) => {
+  if (!origin || !host) return false;
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+};
+
+app.use(cors((req, callback) => {
+  const origin = req.header('Origin');
+  const host = req.get('host');
+  const isAllowed = !origin || allowedOrigins.includes(origin) || isSameHostOrigin(origin, host) || isDevelopmentOrigin(origin);
+
+  if (isAllowed) {
+    callback(null, { origin: true, credentials: true });
+  } else {
+    callback(new Error(`CORS policy blocked access from origin: ${origin}`));
+  }
 }));
 
 // Rate Limiting Middlewares (Throttling Brute-Force/DDoS)
@@ -76,7 +93,7 @@ app.use('/api/auth/login', authLimiter);
 
 
 // Static Files - Serve uploaded files for local fallback
-const uploadsDir = path.resolve('public/uploads');
+const uploadsDir = path.join(backendRoot, 'public', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
@@ -88,7 +105,16 @@ app.use('/api/album', albumRouter);
 app.use('/api/saavn', saavnRouter);
 app.use('/api/auth', authRouter);
 
-app.get('/', (req, res) => res.send("Music Vibe API Working"));
+app.get('/api/health', (req, res) => res.send("Music Vibe API Working"));
+
+if (fs.existsSync(frontendDistDir)) {
+  app.use(express.static(frontendDistDir));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendDistDir, 'index.html'));
+  });
+} else {
+  app.get('/', (req, res) => res.send("Music Vibe API Working"));
+}
 
 // Database Pre-population Helper
 const prePopulateDb = async () => {
