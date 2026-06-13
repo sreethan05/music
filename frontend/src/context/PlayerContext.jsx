@@ -5,6 +5,56 @@ import API_URL from "../config/api";
 
 export const PlayerContext = createContext();
 
+const DEMO_TOKEN = "music-vibe-demo-session";
+const FALLBACK_COVER = "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop&q=70";
+
+const fallbackAlbums = [
+  {
+    _id: "fallback_album_telugu",
+    name: "Telugu Melodies",
+    desc: "Warm Telugu favorites for late-night listening.",
+    bgColour: "#0284c7",
+    image: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop&q=70"
+  },
+  {
+    _id: "fallback_album_bollywood",
+    name: "Bollywood Hits",
+    desc: "Bright Hindi cinema-inspired pop and romance.",
+    bgColour: "#b91c1c",
+    image: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&auto=format&fit=crop&q=70"
+  },
+  {
+    _id: "fallback_album_pop",
+    name: "English Pop",
+    desc: "Clean, upbeat pop cuts for a polished demo.",
+    bgColour: "#0f766e",
+    image: "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&auto=format&fit=crop&q=70"
+  }
+];
+
+const fallbackSongs = [
+  ["demo_song_1", "Naa Madhi", "Soulful Telugu-inspired melody", "Telugu Melodies", "4:12", 1],
+  ["demo_song_2", "Kesariya Nights", "Acoustic Hindi romance blend", "Bollywood Hits", "3:48", 2],
+  ["demo_song_3", "Neon Pulse", "Retro synth pop groove", "English Pop", "3:36", 3],
+  ["demo_song_4", "Samayama", "Soft piano and strings ballad", "Telugu Melodies", "4:01", 4],
+  ["demo_song_5", "Chaleya Drift", "Dance-pop rhythm with warm vocals", "Bollywood Hits", "3:29", 5],
+  ["demo_song_6", "Midnight Signal", "Late-night electronic pop", "English Pop", "3:54", 6],
+  ["demo_song_7", "Srivalli Acoustic", "Gentle acoustic folk-pop", "Telugu Melodies", "4:18", 7],
+  ["demo_song_8", "Kabira Sky", "Sufi-rock inspired unplugged cut", "Bollywood Hits", "4:05", 8],
+  ["demo_song_9", "Golden Hour", "Bright indie-pop drive", "English Pop", "3:42", 9],
+  ["demo_song_10", "Aradhya", "Sunny romantic duet energy", "Telugu Melodies", "3:57", 10],
+  ["demo_song_11", "Raataan Lofi", "Soft lofi bedroom-pop edit", "Bollywood Hits", "3:33", 11],
+  ["demo_song_12", "Velvet Run", "Funky disco-pop pulse", "English Pop", "3:46", 12]
+].map(([id, name, desc, album, duration, helixIndex], idx) => ({
+  _id: id,
+  name,
+  desc,
+  album,
+  duration,
+  image: fallbackAlbums[idx % fallbackAlbums.length].image,
+  file: `https://www.soundhelix.com/examples/mp3/SoundHelix-Song-${helixIndex}.mp3`
+}));
+
 const extractDominantColor = (imageUrl) => {
   return new Promise((resolve) => {
     const img = new Image();
@@ -140,7 +190,7 @@ const PlayerContextProvider = (props) => {
           return {
             ...p,
             tracks: newTracks,
-            image: newTracks.length > 0 ? newTracks[0].image : "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop&q=60"
+            image: newTracks.length > 0 ? newTracks[0].image : FALLBACK_COVER
           };
         }
         return p;
@@ -156,7 +206,7 @@ const PlayerContextProvider = (props) => {
       _id: `custom_playlist_${Date.now()}`,
       name: name || "My Custom Playlist",
       desc: "Custom user playlist.",
-      image: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop&q=60",
+      image: FALLBACK_COVER,
       bgColour: "rgb(0, 136, 255)",
       tracks: []
     };
@@ -291,6 +341,17 @@ const PlayerContextProvider = (props) => {
     });
   };
 
+  const loadFallbackLibrary = (message = "Live library is warming up, so demo tracks are ready now.") => {
+    setAlbumsData(fallbackAlbums);
+    setSongsData(fallbackSongs);
+    setCurrentQueue(fallbackSongs);
+    setLibraryError(message);
+    if (!currentSongRef.current && fallbackSongs.length > 0) {
+      setCurrentSong(fallbackSongs[0]);
+      audioRef.current.src = fallbackSongs[0].file;
+    }
+  };
+
   useEffect(() => {
     // Set CORS for Audio element so Web Audio API works without CORS errors
     if (audioRef.current) {
@@ -350,7 +411,7 @@ const PlayerContextProvider = (props) => {
       }
     } catch (error) {
       console.error("Error loading library data from backend:", error);
-      setLibraryError("Music library is warming up. Please refresh in a moment.");
+      loadFallbackLibrary();
     } finally {
       setIsLibraryLoading(false);
     }
@@ -367,6 +428,7 @@ const PlayerContextProvider = (props) => {
   useEffect(() => {
     const verifySession = async () => {
       const savedToken = localStorage.getItem('token');
+      if (savedToken === DEMO_TOKEN) return;
       if (savedToken) {
         try {
           const res = await axios.get(`${API_URL}/api/auth/profile`, {
@@ -433,6 +495,27 @@ const PlayerContextProvider = (props) => {
     }
   }
 
+  const enterDemoMode = () => {
+    const demoUser = {
+      _id: "demo_user",
+      name: "Demo Listener",
+      email: "demo@musicvibe.app",
+      role: "listener",
+      isDemo: true
+    };
+    setToken(DEMO_TOKEN);
+    setUser(demoUser);
+    try {
+      localStorage.setItem('token', DEMO_TOKEN);
+      localStorage.setItem('user', JSON.stringify(demoUser));
+    } catch (e) {
+      console.error("Failed to save demo session:", e);
+    }
+    if (songsDataRef.current.length === 0) {
+      loadFallbackLibrary("Demo mode is ready with sample tracks while the live catalog connects.");
+    }
+  };
+
   const createPlaylist = async (name, tracks) => {
     if (!tracks || tracks.length === 0) return { success: false, message: "No tracks to add." };
     
@@ -446,7 +529,7 @@ const PlayerContextProvider = (props) => {
       _id: `custom_playlist_${Date.now()}`,
       name: name || "Imported Playlist",
       desc: `Imported playlist containing ${tracks.length} tracks.`,
-      image: tracks[0]?.image || "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop&q=60",
+      image: tracks[0]?.image || FALLBACK_COVER,
       bgColour: dominantColor.includes(",") ? `rgb(${dominantColor})` : dominantColor,
       tracks: tracks.map((t, idx) => ({
         _id: t._id || t.id || `custom_song_${Date.now()}_${idx}`,
@@ -807,6 +890,7 @@ const PlayerContextProvider = (props) => {
     currentQueue,
     loginUser,
     registerUser,
+    enterDemoMode,
     logoutUser,
     createPlaylist,
     customPlaylists,

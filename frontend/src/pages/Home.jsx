@@ -2,6 +2,8 @@ import { useContext, useMemo, useState } from "react";
 import { PlayerContext } from "../context/PlayerContext";
 import { AlertCircle, Music, Play, SearchX, Sparkles, Volume2, Plus } from "lucide-react";
 
+const FALLBACK_COVER = "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop&q=70";
+
 const Home = () => {
   const {
     songsData,
@@ -37,6 +39,10 @@ const Home = () => {
   const formatIndex = (idx) => {
     const num = idx + 1;
     return num < 10 ? `0${num}` : num;
+  };
+
+  const handleImageError = (event) => {
+    event.currentTarget.src = FALLBACK_COVER;
   };
 
   return (
@@ -79,6 +85,7 @@ const Home = () => {
             <img
               src={featuredSong.image}
               alt={featuredSong.name}
+              onError={handleImageError}
               className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700"
             />
             <div className="absolute inset-0 bg-gradient-to-r from-white via-white/95 to-white/35 z-0" />
@@ -130,6 +137,7 @@ const Home = () => {
                 <img 
                   src={song.image} 
                   alt={song.name} 
+                  onError={handleImageError}
                   className="w-10 h-10 rounded-lg object-cover shadow border border-slate-200/40"
                 />
                 <div className="overflow-hidden flex-1">
@@ -209,6 +217,7 @@ const Home = () => {
                     <img
                       src={song.image}
                       alt={song.name}
+                      onError={handleImageError}
                       className="w-8 h-8 rounded object-cover shadow-sm border border-slate-200/40"
                     />
                     <p className={`truncate text-slate-800 ${isPlaying ? "font-black" : "font-extrabold"}`}>{song.name}</p>

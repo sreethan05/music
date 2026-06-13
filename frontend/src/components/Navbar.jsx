@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { PlayerContext } from "../context/PlayerContext";
 import { ChevronLeft, ChevronRight, Download, LogIn, LogOut, LayoutDashboard, UserCheck, Sun, Moon, Search } from "lucide-react";
@@ -8,6 +8,19 @@ const Navbar = () => {
   const location = useLocation();
   const { user, logoutUser, theme, toggleTheme, searchQuery, setSearchQuery } = useContext(PlayerContext);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [installLabel, setInstallLabel] = useState("Install App");
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      setInstallPrompt(event);
+      setInstallLabel("Install App");
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+  }, []);
 
   const handleLogout = () => {
     logoutUser();
@@ -21,6 +34,17 @@ const Navbar = () => {
     if (location.pathname !== "/" && location.pathname !== "/search") {
       navigate("/");
     }
+  };
+
+  const handleInstall = async () => {
+    if (!installPrompt) {
+      setInstallLabel("Browser Ready");
+      window.setTimeout(() => setInstallLabel("Install App"), 1800);
+      return;
+    }
+
+    await installPrompt.prompt();
+    setInstallPrompt(null);
   };
 
   return (
@@ -55,9 +79,13 @@ const Navbar = () => {
 
       {/* Action Controls: Install, Theme, Profile */}
       <div className="flex items-center gap-3 relative">
-        <button className="hidden sm:flex px-4 py-2.5 bg-white border border-slate-200/60 hover:bg-slate-50 text-slate-700 text-xs font-black rounded-full hover:scale-105 active:scale-95 transition-all duration-200 items-center gap-2 cursor-pointer shadow-sm">
+        <button
+          onClick={handleInstall}
+          className="hidden sm:flex px-4 py-2.5 bg-white border border-slate-200/60 hover:bg-slate-50 text-slate-700 text-xs font-black rounded-full hover:scale-105 active:scale-95 transition-all duration-200 items-center gap-2 cursor-pointer shadow-sm"
+          title="Install Music Vibe"
+        >
           <Download className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
-          <span>Install App</span>
+          <span>{installLabel}</span>
         </button>
 
         {/* Theme Switcher Toggle */}

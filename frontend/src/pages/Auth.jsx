@@ -1,11 +1,11 @@
 import { useState, useContext, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { PlayerContext } from "../context/PlayerContext";
-import { Music, Eye, EyeOff, Mail, Lock, User, ArrowRight } from "lucide-react";
+import { Music, Eye, EyeOff, Mail, Lock, User, ArrowRight, Headphones, Sparkles } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { loginUser, registerUser, token, user } = useContext(PlayerContext);
+  const { loginUser, registerUser, enterDemoMode, token, user } = useContext(PlayerContext);
 
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
@@ -58,6 +58,11 @@ const Auth = () => {
     }
   };
 
+  const handleDemoMode = () => {
+    enterDemoMode();
+    navigate("/");
+  };
+
   return (
     <div className="flex-1 h-full overflow-y-auto bg-gradient-to-tr from-[#f0f4ff] via-[#faf8ff] to-[#fefeff] relative overflow-hidden select-none flex items-center justify-center p-6 no-scrollbar">
       
@@ -91,11 +96,35 @@ const Auth = () => {
       <div className="absolute top-[20%] right-[5%] w-80 h-80 bg-purple-400/12 rounded-full blur-3xl pointer-events-none" />
 
       {/* Main card */}
-      <div className="w-full max-w-[440px] flex flex-col items-center relative z-10">
+      <div className="w-full max-w-[960px] grid grid-cols-1 lg:grid-cols-[1fr_440px] gap-8 items-center relative z-10">
+        <div className="hidden lg:flex flex-col gap-6 pr-8">
+          <div className="inline-flex w-fit items-center gap-2 rounded-full border border-indigo-100 bg-white/70 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-indigo-600 shadow-sm">
+            <Sparkles className="w-3.5 h-3.5" />
+            Portfolio-ready music experience
+          </div>
+          <div>
+            <h1 className="text-5xl font-black tracking-tight leading-[0.95] text-slate-900">
+              Streamlined listening, playlists, and a real player flow.
+            </h1>
+            <p className="mt-5 max-w-xl text-sm font-semibold leading-7 text-slate-500">
+              Explore the full app instantly with demo mode, or sign in to save personal favorites and playlists.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-3 max-w-xl">
+            {["Full player", "Smart search", "Playlists"].map((item) => (
+              <div key={item} className="rounded-2xl border border-white/70 bg-white/65 px-4 py-3 shadow-sm">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{item}</p>
+                <div className="mt-3 h-1.5 rounded-full bg-gradient-to-r from-indigo-500 to-blue-400" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="w-full flex flex-col items-center">
         
         {/* Header Logo & Title */}
         <div className="w-full px-6 pb-6 select-none flex flex-col items-center">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-650 flex items-center justify-center text-white mb-4 shadow-[0_8px_20px_rgba(37,99,235,0.25)] hover:scale-105 transition-all duration-300 cursor-pointer">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white mb-4 shadow-[0_8px_20px_rgba(37,99,235,0.25)] hover:scale-105 transition-all duration-300 cursor-pointer">
             <Music className="w-6 h-6 stroke-[2.5]" />
           </div>
 
@@ -103,7 +132,7 @@ const Auth = () => {
             Music <span className="text-indigo-600">Vibe</span>
           </h2>
           <p className="text-xs text-slate-500 mt-1.5 text-center font-bold tracking-wide">
-            Unleash your playlists.
+            Sign in or explore instantly.
           </p>
         </div>
 
@@ -115,7 +144,7 @@ const Auth = () => {
             <h3 className="text-lg font-black text-slate-800 tracking-tight">
               {isLogin ? "Sign In" : "Sign Up"}
             </h3>
-            <div className="h-[3px] w-8 bg-gradient-to-r from-blue-600 to-purple-650 rounded-full mt-2" />
+            <div className="h-[3px] w-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full mt-2" />
           </div>
 
           {error && (
@@ -202,6 +231,15 @@ const Auth = () => {
                 </>
               )}
             </button>
+
+            <button
+              type="button"
+              onClick={handleDemoMode}
+              className="w-full py-3.5 bg-slate-950 hover:bg-slate-800 text-white font-extrabold text-xs tracking-wider uppercase rounded-[16px] hover:scale-[1.01] active:scale-[0.99] transition-all duration-300 cursor-pointer shadow-lg shadow-slate-900/10 flex items-center justify-center gap-2"
+            >
+              <Headphones className="w-4 h-4" />
+              <span>Explore Demo</span>
+            </button>
           </form>
 
         </div>
@@ -216,6 +254,8 @@ const Auth = () => {
           >
             {isLogin ? "Create an account" : "Sign In"}
           </button>
+        </div>
+
         </div>
 
       </div>
