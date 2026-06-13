@@ -1,12 +1,34 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useContext } from "react";
 import { PlayerContext } from "../context/PlayerContext";
-import { Home, TrendingUp, Rss, Disc, Calendar, Radio, Heart, Users, Library, ChevronRight, Menu } from "lucide-react";
+import { 
+  Home, 
+  Search as SearchIcon, 
+  Heart, 
+  Library, 
+  ChevronRight, 
+  LogIn, 
+  Menu, 
+  Plus, 
+  ListMusic 
+} from "lucide-react";
 
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useContext(PlayerContext);
+  const { user, albumsData, createEmptyPlaylist } = useContext(PlayerContext);
+
+  const customPlaylists = albumsData.filter(album => album._id && album._id.startsWith("custom_playlist_"));
+
+  const handleCreatePlaylistInline = () => {
+    const name = prompt("Enter a name for your new playlist:");
+    if (name && name.trim()) {
+      const newPlaylist = createEmptyPlaylist(name.trim());
+      if (newPlaylist && newPlaylist._id) {
+        navigate(`/album/${newPlaylist._id}`);
+      }
+    }
+  };
 
   const isActive = (path) => location.pathname === path;
 
@@ -53,58 +75,58 @@ const Sidebar = () => {
         </div>
 
         {/* Navigation Menu Options */}
-        <div className="flex flex-col gap-1">
-          {/* Main items */}
+        <div className="flex flex-col gap-1.5">
           <div onClick={() => navigate("/")} className={itemClass("/")}>
             <Home className="w-4.5 h-4.5 stroke-[2.2]" />
             <span>Home</span>
           </div>
 
           <div onClick={() => navigate("/search")} className={itemClass("/search")}>
-            <TrendingUp className="w-4.5 h-4.5 stroke-[2.2]" />
-            <span>Trends</span>
+            <SearchIcon className="w-4.5 h-4.5 stroke-[2.2]" />
+            <span>Search</span>
           </div>
-
-          <div onClick={() => navigate("/")} className={itemClass("/feed")}>
-            <Rss className="w-4.5 h-4.5 stroke-[2.2]" />
-            <span>Feed</span>
-          </div>
-
-          {/* Discover Category */}
-          <span className="text-[9px] font-black tracking-widest text-slate-400 uppercase mt-5 mb-2 pl-3">Discover</span>
-          
-          <div onClick={() => navigate("/")} className={itemClass("/new-notable")}>
-            <Disc className="w-4.5 h-4.5 stroke-[2.2]" />
-            <span>New and Notable</span>
-          </div>
-          
-          <div onClick={() => navigate("/")} className={itemClass("/release-calendar")}>
-            <Calendar className="w-4.5 h-4.5 stroke-[2.2]" />
-            <span>Release Calendar</span>
-          </div>
-
-          <div onClick={() => navigate("/")} className={itemClass("/events")}>
-            <Radio className="w-4.5 h-4.5 stroke-[2.2]" />
-            <span>Events</span>
-          </div>
-
-          {/* Your Collection Category */}
-          <span className="text-[9px] font-black tracking-widest text-slate-400 uppercase mt-5 mb-2 pl-3">Your Collection</span>
 
           <div onClick={() => navigate("/profile")} className={itemClass("/profile")}>
             <Heart className="w-4.5 h-4.5 stroke-[2.2]" />
-            <span>Favorite Songs</span>
-          </div>
-
-          <div onClick={() => navigate("/")} className={itemClass("/artists")}>
-            <Users className="w-4.5 h-4.5 stroke-[2.2]" />
-            <span>Artist</span>
+            <span>Liked Songs</span>
           </div>
 
           <div onClick={() => navigate("/profile")} className={itemClass("/albums")}>
             <Library className="w-4.5 h-4.5 stroke-[2.2]" />
             <span>Albums</span>
           </div>
+
+          {/* Playlist Creation Category */}
+          <span className="text-[9px] font-black tracking-widest text-slate-400 uppercase mt-5 mb-2 pl-3">Playlists</span>
+
+          <div 
+            onClick={handleCreatePlaylistInline} 
+            className="flex items-center gap-3.5 px-3.5 py-2.5 rounded-2xl font-extrabold text-xs tracking-wide transition-all duration-200 text-slate-500 hover:text-slate-950 hover:bg-slate-100/50 cursor-pointer select-none"
+          >
+            <Plus className="w-4.5 h-4.5 stroke-[2.5] text-amber-500" />
+            <span>Create Playlist</span>
+          </div>
+
+          {/* List of custom playlists */}
+          {customPlaylists.length > 0 && (
+            <div className="flex flex-col gap-1 mt-2 max-h-[200px] overflow-y-auto pr-1 no-scrollbar border-t border-slate-100 pt-2">
+              {customPlaylists.map(playlist => (
+                <div
+                  key={playlist._id}
+                  onClick={() => navigate(`/album/${playlist._id}`)}
+                  className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all truncate cursor-pointer ${
+                    location.pathname === `/album/${playlist._id}`
+                      ? "bg-slate-100 text-slate-900"
+                      : "text-slate-500 hover:text-slate-800 hover:bg-slate-50/55"
+                  }`}
+                  title={playlist.name}
+                >
+                  <ListMusic className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                  <span className="truncate">{playlist.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -124,6 +146,19 @@ const Sidebar = () => {
             </div>
           </div>
           <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
+        </div>
+      )}
+      {!user && (
+        <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl shadow-sm">
+          <p className="text-[11px] font-extrabold text-slate-800 leading-snug">Listening as guest</p>
+          <p className="text-[9px] text-slate-400 font-bold leading-relaxed mt-1">Sign in to save playlists and favorites.</p>
+          <button
+            onClick={() => navigate("/auth")}
+            className="mt-3 w-full py-2.5 bg-slate-900 hover:bg-slate-950 text-white rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            <span>Sign In</span>
+          </button>
         </div>
       )}
 

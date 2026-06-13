@@ -3,7 +3,7 @@ import { PlayerContext } from "../context/PlayerContext";
 import { Music, Plus, MoreHorizontal } from "lucide-react";
 
 const RightPanel = () => {
-  const { currentSong } = useContext(PlayerContext);
+  const { currentSong, openPlaylistModal } = useContext(PlayerContext);
 
   // Static tags for Shortcuts
   const shortcuts = [
@@ -106,7 +106,11 @@ const RightPanel = () => {
                 </p>
               </div>
               
-              <button className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200/50 flex items-center justify-center text-slate-500 hover:text-indigo-650 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer">
+              <button 
+                onClick={() => openPlaylistModal(currentSong)}
+                className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200/50 flex items-center justify-center text-slate-500 hover:text-indigo-650 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer"
+                title="Add to Playlist"
+              >
                 <Plus className="w-4.5 h-4.5 stroke-[2.5]" />
               </button>
             </div>

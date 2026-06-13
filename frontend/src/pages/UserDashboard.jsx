@@ -27,7 +27,8 @@ const UserDashboard = () => {
     playStatus, 
     togglePlay,
     theme,
-    setTheme
+    setTheme,
+    deletePlaylist
   } = useContext(PlayerContext);
 
   const [ambientIntensity, setAmbientIntensity] = useState("high");
@@ -55,15 +56,7 @@ const UserDashboard = () => {
   const handleDeletePlaylist = (playlistId, name, e) => {
     e.stopPropagation();
     if (confirm(`Are you sure you want to delete the playlist "${name}"?`)) {
-      try {
-        const savedPlaylists = JSON.parse(localStorage.getItem('custom_playlists') || '[]');
-        const updated = savedPlaylists.filter(p => p._id !== playlistId);
-        localStorage.setItem('custom_playlists', JSON.stringify(updated));
-        // Force refresh context
-        window.location.reload();
-      } catch (err) {
-        console.error("Failed to delete custom playlist:", err);
-      }
+      deletePlaylist(playlistId);
     }
   };
 

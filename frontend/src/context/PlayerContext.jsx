@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import API_URL from "../config/api";
@@ -49,8 +50,20 @@ const PlayerContextProvider = (props) => {
   const audioRef = useRef(new Audio());
   const seekBarRef = useRef(null);
 
+  // Web Audio EQ, Sleep Timer and Fade refs/states
+  const audioContextRef = useRef(null);
+  const sourceRef = useRef(null);
+  const filtersRef = useRef([]);
+  const [eqPreset, setEqPreset] = useState("flat");
+  
+  const [sleepTimer, setSleepTimer] = useState(null); // in seconds
+  const sleepTimerRef = useRef(null);
+  const fadeIntervalRef = useRef(null);
+
   const [songsData, setSongsData] = useState([]);
   const [albumsData, setAlbumsData] = useState([]);
+  const [isLibraryLoading, setIsLibraryLoading] = useState(true);
+  const [libraryError, setLibraryError] = useState("");
   const [customPlaylists, setCustomPlaylists] = useState(() => {
     try {
       const saved = localStorage.getItem('custom_playlists');
@@ -59,6 +72,110 @@ const PlayerContextProvider = (props) => {
       return [];
     }
   });
+
+  const [playlistModalOpen, setPlaylistModalOpen] = useState(false);
+  const [playlistModalSong, setPlaylistModalSong] = useState(null);
+
+  const openPlaylistModal = (song) => {
+    setPlaylistModalSong(song);
+    setPlaylistModalOpen(true);
+  };
+
+  const closePlaylistModal = () => {
+    setPlaylistModalSong(null);
+    setPlaylistModalOpen(false);
+  };
+
+  const addSongToPlaylist = async (song, playlistId) => {
+    if (!song) return { success: false, message: "No song selected." };
+    let success = false;
+    let message = "";
+
+    const trackToAdd = {
+      _id: song._id || song.id,
+      name: song.name,
+      image: song.image,
+      desc: song.desc || song.artist || "Unknown Artist",
+      file: song.file,
+      duration: song.duration || "3:00",
+      album: song.album || "Single"
+    };
+
+    setCustomPlaylists(prev => {
+      const updated = prev.map(p => {
+        if (p._id === playlistId) {
+          const exists = p.tracks.some(t => t._id === trackToAdd._id);
+          if (exists) {
+            message = "Song is already in this playlist!";
+            return p;
+          }
+          success = true;
+          const newTracks = [...p.tracks, trackToAdd];
+          return {
+            ...p,
+            tracks: newTracks,
+            image: p.tracks.length === 0 ? trackToAdd.image : p.image
+          };
+        }
+        return p;
+      });
+      if (success) {
+        localStorage.setItem('custom_playlists', JSON.stringify(updated));
+      }
+      return updated;
+    });
+
+    if (success) {
+      return { success: true, message: "Added to playlist!" };
+    } else {
+      return { success: false, message: message || "Playlist not found." };
+    }
+  };
+
+  const removeSongFromPlaylist = (songId, playlistId) => {
+    setCustomPlaylists(prev => {
+      const updated = prev.map(p => {
+        if (p._id === playlistId) {
+          const newTracks = p.tracks.filter(t => t._id !== songId);
+          return {
+            ...p,
+            tracks: newTracks,
+            image: newTracks.length > 0 ? newTracks[0].image : "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop&q=60"
+          };
+        }
+        return p;
+      });
+      localStorage.setItem('custom_playlists', JSON.stringify(updated));
+      return updated;
+    });
+    return { success: true, message: "Removed from playlist!" };
+  };
+
+  const createEmptyPlaylist = (name) => {
+    const newPlaylist = {
+      _id: `custom_playlist_${Date.now()}`,
+      name: name || "My Custom Playlist",
+      desc: "Custom user playlist.",
+      image: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop&q=60",
+      bgColour: "rgb(0, 136, 255)",
+      tracks: []
+    };
+    setCustomPlaylists(prev => {
+      const updated = [newPlaylist, ...prev];
+      localStorage.setItem('custom_playlists', JSON.stringify(updated));
+      return updated;
+    });
+    return newPlaylist;
+  };
+
+  const deletePlaylist = (playlistId) => {
+    setCustomPlaylists(prev => {
+      const updated = prev.filter(p => p._id !== playlistId);
+      localStorage.setItem('custom_playlists', JSON.stringify(updated));
+      return updated;
+    });
+    return { success: true, message: "Playlist deleted!" };
+  };
   
   const [currentSong, setCurrentSong] = useState(null);
   const [playStatus, setPlayStatus] = useState(false);
@@ -120,6 +237,7 @@ const PlayerContextProvider = (props) => {
   });
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   const [likedSongs, setLikedSongs] = useState(() => {
     try {
@@ -150,12 +268,47 @@ const PlayerContextProvider = (props) => {
   const songsDataRef = useRef([]);
   const isShuffleRef = useRef(false);
 
+  const [recentlyPlayed, setRecentlyPlayed] = useState(() => {
+    try {
+      const saved = localStorage.getItem('recently_played');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const addToRecentlyPlayed = (song) => {
+    if (!song) return;
+    setRecentlyPlayed(prev => {
+      const filtered = prev.filter(s => s._id !== song._id);
+      const updated = [song, ...filtered].slice(0, 12);
+      try {
+        localStorage.setItem('recently_played', JSON.stringify(updated));
+      } catch (e) {
+        console.error("Failed to save recently played:", e);
+      }
+      return updated;
+    });
+  };
+
+  useEffect(() => {
+    // Set CORS for Audio element so Web Audio API works without CORS errors
+    if (audioRef.current) {
+      audioRef.current.crossOrigin = "anonymous";
+    }
+  }, []);
+
   useEffect(() => {
     currentSongRef.current = currentSong;
-    if (currentSong && currentSong.image) {
-      extractDominantColor(currentSong.image).then((colorStr) => {
-        document.documentElement.style.setProperty('--song-theme-color', colorStr);
-      });
+    if (currentSong) {
+      setTimeout(() => {
+        addToRecentlyPlayed(currentSong);
+      }, 0);
+      if (currentSong.image) {
+        extractDominantColor(currentSong.image).then((colorStr) => {
+          document.documentElement.style.setProperty('--song-theme-color', colorStr);
+        });
+      }
     }
   }, [currentSong]);
 
@@ -179,9 +332,13 @@ const PlayerContextProvider = (props) => {
 
   // Fetch initial songs and albums
   const fetchData = async () => {
+    setIsLibraryLoading(true);
+    setLibraryError("");
     try {
-      const albumsRes = await axios.get(`${API_URL}/api/album/list`);
-      const songsRes = await axios.get(`${API_URL}/api/song/list`);
+      const [albumsRes, songsRes] = await Promise.all([
+        axios.get(`${API_URL}/api/album/list`),
+        axios.get(`${API_URL}/api/song/list`)
+      ]);
       
       setAlbumsData(albumsRes.data.albums || []);
       setSongsData(songsRes.data.songs || []);
@@ -193,6 +350,9 @@ const PlayerContextProvider = (props) => {
       }
     } catch (error) {
       console.error("Error loading library data from backend:", error);
+      setLibraryError("Music library is warming up. Please refresh in a moment.");
+    } finally {
+      setIsLibraryLoading(false);
     }
   };
 
@@ -348,10 +508,181 @@ const PlayerContextProvider = (props) => {
       audio.removeEventListener("timeupdate", handleTimeUpdate);
       audio.removeEventListener("ended", handleEnded);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoop]);
+
+  const initAudioContext = () => {
+    if (audioContextRef.current) return;
+
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AudioContextClass();
+      audioContextRef.current = ctx;
+
+      // 5 frequency bands: 60Hz, 230Hz, 910Hz, 4kHz, 14kHz
+      const freqs = [60, 230, 910, 4000, 14000];
+      const filters = freqs.map((freq, idx) => {
+        const filter = ctx.createBiquadFilter();
+        filter.type = idx === 0 ? "lowshelf" : idx === freqs.length - 1 ? "highshelf" : "peaking";
+        filter.frequency.value = freq;
+        filter.Q.value = 1.0;
+        filter.gain.value = 0;
+        return filter;
+      });
+
+      filtersRef.current = filters;
+
+      const source = ctx.createMediaElementSource(audioRef.current);
+      sourceRef.current = source;
+
+      source.connect(filters[0]);
+      for (let i = 0; i < filters.length - 1; i++) {
+        filters[i].connect(filters[i + 1]);
+      }
+      filters[filters.length - 1].connect(ctx.destination);
+      console.log("Web Audio EQ initialized successfully.");
+    } catch (e) {
+      console.warn("Web Audio API blocked or not supported on this track/origin:", e);
+    }
+  };
+
+  const applyEqPreset = (presetName) => {
+    setEqPreset(presetName);
+    const eqPresets = {
+      flat: [0, 0, 0, 0, 0],
+      bassBoost: [6, 4, 0, 0, -2],
+      vocalBoost: [-2, 0, 4, 3, 0],
+      trebleBoost: [-3, -1, 0, 4, 6],
+      electronic: [5, 2, -1, 2, 4],
+      classical: [3, 2, 0, -1, -3]
+    };
+    const gains = eqPresets[presetName] || eqPresets.flat;
+    
+    initAudioContext();
+    
+    if (filtersRef.current.length > 0) {
+      filtersRef.current.forEach((filter, idx) => {
+        const ctx = audioContextRef.current;
+        if (ctx) {
+          filter.gain.linearRampToValueAtTime(gains[idx], ctx.currentTime + 0.15);
+        } else {
+          filter.gain.value = gains[idx];
+        }
+      });
+    }
+  };
+
+  const startSleepTimer = (minutes) => {
+    if (sleepTimerRef.current) {
+      clearInterval(sleepTimerRef.current);
+      sleepTimerRef.current = null;
+    }
+
+    if (minutes === 0 || minutes === null) {
+      setSleepTimer(null);
+      return;
+    }
+
+    let secondsLeft = minutes * 60;
+    setSleepTimer(secondsLeft);
+
+    sleepTimerRef.current = setInterval(() => {
+      secondsLeft -= 1;
+      setSleepTimer(secondsLeft);
+
+      if (secondsLeft <= 0) {
+        clearInterval(sleepTimerRef.current);
+        sleepTimerRef.current = null;
+        fadeAndPause();
+      }
+    }, 1000);
+  };
+
+  const fadeAndPause = () => {
+    const originalVol = volume;
+    let currentVol = originalVol;
+    const fadeInterval = setInterval(() => {
+      currentVol -= 0.05;
+      if (currentVol <= 0) {
+        clearInterval(fadeInterval);
+        audioRef.current.pause();
+        setPlayStatus(false);
+        audioRef.current.volume = isMuted ? 0 : originalVol;
+        setSleepTimer(null);
+      } else {
+        audioRef.current.volume = currentVol;
+      }
+    }, 100);
+  };
+
+  const fadePlayTrack = (song, queue = null) => {
+    if (!song) return;
+
+    if (fadeIntervalRef.current) {
+      clearInterval(fadeIntervalRef.current);
+      fadeIntervalRef.current = null;
+    }
+
+    // If no song is loaded or paused, play instantly without fading
+    if (!audioRef.current.src || audioRef.current.paused) {
+      if (queue) setCurrentQueue(queue);
+      setCurrentSong(song);
+      audioRef.current.src = song.file;
+      audioRef.current.load();
+      play();
+      return;
+    }
+
+    const targetVol = isMuted ? 0 : volume;
+    let fadeOutVol = targetVol;
+    
+    fadeIntervalRef.current = setInterval(() => {
+      fadeOutVol -= 0.08;
+      if (fadeOutVol <= 0) {
+        clearInterval(fadeIntervalRef.current);
+        audioRef.current.volume = 0;
+        
+        if (queue) setCurrentQueue(queue);
+        setCurrentSong(song);
+        audioRef.current.src = song.file;
+        audioRef.current.load();
+        
+        if (audioRef.current.src) {
+          initAudioContext();
+          if (audioContextRef.current && audioContextRef.current.state === "suspended") {
+            audioContextRef.current.resume();
+          }
+          audioRef.current.play()
+            .then(() => {
+              setPlayStatus(true);
+              
+              let fadeInVol = 0;
+              audioRef.current.volume = 0;
+              fadeIntervalRef.current = setInterval(() => {
+                fadeInVol += 0.08;
+                if (fadeInVol >= targetVol) {
+                  clearInterval(fadeIntervalRef.current);
+                  fadeIntervalRef.current = null;
+                  audioRef.current.volume = targetVol;
+                } else {
+                  audioRef.current.volume = fadeInVol;
+                }
+              }, 40);
+            })
+            .catch(err => console.error("DJ Fade Playback failed:", err));
+        }
+      } else {
+        audioRef.current.volume = fadeOutVol;
+      }
+    }, 40);
+  };
 
   const play = () => {
     if (audioRef.current.src) {
+      initAudioContext();
+      if (audioContextRef.current && audioContextRef.current.state === "suspended") {
+        audioContextRef.current.resume();
+      }
       audioRef.current.play()
         .then(() => setPlayStatus(true))
         .catch(err => console.error("Failed to start audio playback:", err));
@@ -375,26 +706,12 @@ const PlayerContextProvider = (props) => {
     const queueToUse = customQueue || songsData;
     const song = queueToUse.find(s => s._id === id);
     if (song) {
-      setCurrentQueue(queueToUse);
-      setCurrentSong(song);
-      audioRef.current.src = song.file;
-      audioRef.current.load();
-      audioRef.current.play()
-        .then(() => setPlayStatus(true))
-        .catch(err => console.error("Playback failed for song:", id, err));
+      fadePlayTrack(song, queueToUse);
     }
   };
 
   const playTrackDirectly = (song, customQueue = null) => {
-    if (customQueue) {
-      setCurrentQueue(customQueue);
-    }
-    setCurrentSong(song);
-    audioRef.current.src = song.file;
-    audioRef.current.load();
-    audioRef.current.play()
-      .then(() => setPlayStatus(true))
-      .catch(err => console.error("Playback failed for live track:", err));
+    fadePlayTrack(song, customQueue);
   };
 
   function next() {
@@ -403,28 +720,20 @@ const PlayerContextProvider = (props) => {
 
     if (activeSongs.length === 0 || !activeSong) return;
 
+    let nextSong;
     if (isShuffleRef.current) {
       const randomIndex = Math.floor(Math.random() * activeSongs.length);
-      const nextSong = activeSongs[randomIndex];
-      setCurrentSong(nextSong);
-      audioRef.current.src = nextSong.file;
-      audioRef.current.load();
-      audioRef.current.play()
-        .then(() => setPlayStatus(true))
-        .catch(err => console.error("Shuffle playback failed:", err));
-      return;
+      nextSong = activeSongs[randomIndex];
+    } else {
+      const currentIndex = activeSongs.findIndex(s => s._id === activeSong._id);
+      if (currentIndex !== -1) {
+        const nextIndex = (currentIndex + 1) % activeSongs.length;
+        nextSong = activeSongs[nextIndex];
+      }
     }
 
-    const currentIndex = activeSongs.findIndex(s => s._id === activeSong._id);
-    if (currentIndex !== -1) {
-      const nextIndex = (currentIndex + 1) % activeSongs.length;
-      const nextSong = activeSongs[nextIndex];
-      setCurrentSong(nextSong);
-      audioRef.current.src = nextSong.file;
-      audioRef.current.load();
-      audioRef.current.play()
-        .then(() => setPlayStatus(true))
-        .catch(err => console.error("Next playback failed:", err));
+    if (nextSong) {
+      fadePlayTrack(nextSong, activeSongs);
     }
   }
 
@@ -434,16 +743,15 @@ const PlayerContextProvider = (props) => {
 
     if (activeSongs.length === 0 || !activeSong) return;
 
+    let prevSong;
     const currentIndex = activeSongs.findIndex(s => s._id === activeSong._id);
     if (currentIndex !== -1) {
       const prevIndex = currentIndex === 0 ? activeSongs.length - 1 : currentIndex - 1;
-      const prevSong = activeSongs[prevIndex];
-      setCurrentSong(prevSong);
-      audioRef.current.src = prevSong.file;
-      audioRef.current.load();
-      audioRef.current.play()
-        .then(() => setPlayStatus(true))
-        .catch(err => console.error("Prev playback failed:", err));
+      prevSong = activeSongs[prevIndex];
+    }
+
+    if (prevSong) {
+      fadePlayTrack(prevSong, activeSongs);
     }
   };
 
@@ -482,6 +790,8 @@ const PlayerContextProvider = (props) => {
     seekBarRef,
     songsData,
     albumsData: [...albumsData, ...customPlaylists],
+    isLibraryLoading,
+    libraryError,
     currentSong,
     setCurrentSong,
     playStatus,
@@ -519,7 +829,22 @@ const PlayerContextProvider = (props) => {
     setSearchQuery,
     likedSongs,
     toggleLikeSong,
-    refreshLibrary: fetchData
+    refreshLibrary: fetchData,
+    isFullScreen,
+    setIsFullScreen,
+    eqPreset,
+    applyEqPreset,
+    sleepTimer,
+    startSleepTimer,
+    recentlyPlayed,
+    playlistModalOpen,
+    playlistModalSong,
+    openPlaylistModal,
+    closePlaylistModal,
+    addSongToPlaylist,
+    removeSongFromPlaylist,
+    createEmptyPlaylist,
+    deletePlaylist
   };
 
 

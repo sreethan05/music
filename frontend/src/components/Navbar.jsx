@@ -1,7 +1,7 @@
 import { useContext, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { PlayerContext } from "../context/PlayerContext";
-import { ChevronLeft, ChevronRight, Download, LogOut, LayoutDashboard, UserCheck, Sun, Moon, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, LogIn, LogOut, LayoutDashboard, UserCheck, Sun, Moon, Search } from "lucide-react";
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -49,13 +49,13 @@ const Navbar = () => {
           value={searchQuery}
           onChange={handleSearchChange}
           placeholder="Search for artist, songs and..."
-          className="w-full bg-white border border-slate-200/70 text-slate-800 placeholder:text-slate-400 text-xs pl-11 pr-4 py-2.5 rounded-full focus:outline-none focus:border-slate-350 focus:ring-1 focus:ring-slate-350 transition-all font-semibold shadow-[0_2px_8px_rgba(0,0,0,0.015)]"
+          className="w-full bg-white border border-slate-200/70 text-slate-800 placeholder:text-slate-400 text-xs pl-11 pr-4 py-2.5 rounded-full focus:outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-200 transition-all font-semibold shadow-[0_2px_8px_rgba(0,0,0,0.015)]"
         />
       </div>
 
       {/* Action Controls: Install, Theme, Profile */}
       <div className="flex items-center gap-3 relative">
-        <button className="px-4 py-2.5 bg-white border border-slate-200/60 hover:bg-slate-50 text-slate-700 text-xs font-black rounded-full hover:scale-105 active:scale-95 transition-all duration-200 flex items-center gap-2 cursor-pointer shadow-sm">
+        <button className="hidden sm:flex px-4 py-2.5 bg-white border border-slate-200/60 hover:bg-slate-50 text-slate-700 text-xs font-black rounded-full hover:scale-105 active:scale-95 transition-all duration-200 items-center gap-2 cursor-pointer shadow-sm">
           <Download className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
           <span>Install App</span>
         </button>
@@ -74,7 +74,7 @@ const Navbar = () => {
         </button>
 
         {/* User Profile dropdown menu (Guaranteed user object via gated auth) */}
-        {user && (
+        {user ? (
           <div className="relative">
             <button 
               onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -124,6 +124,14 @@ const Navbar = () => {
               </div>
             )}
           </div>
+        ) : (
+          <button 
+            onClick={() => navigate("/auth")}
+            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-950 text-white text-xs font-black rounded-full hover:scale-105 active:scale-95 transition-all duration-200 flex items-center gap-2 cursor-pointer shadow-sm shadow-slate-900/10"
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Sign In</span>
+          </button>
         )}
       </div>
     </div>

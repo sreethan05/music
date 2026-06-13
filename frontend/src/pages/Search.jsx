@@ -1,11 +1,11 @@
 import { useContext, useState, useEffect, useRef } from "react";
 import { PlayerContext } from "../context/PlayerContext";
-import { Search as SearchIcon, X, Clock, Play, Pause, ListMusic, Check, Loader2 } from "lucide-react";
+import { Search as SearchIcon, X, Clock, Play, Pause, ListMusic, Check, Loader2, Plus } from "lucide-react";
 import axios from "axios";
 import API_URL from "../config/api";
 
 const Search = () => {
-  const { currentSong, playStatus, playTrackDirectly, togglePlay, createPlaylist, searchQuery, setSearchQuery } = useContext(PlayerContext);
+  const { currentSong, playStatus, playTrackDirectly, togglePlay, createPlaylist, searchQuery, setSearchQuery, openPlaylistModal } = useContext(PlayerContext);
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -256,6 +256,7 @@ const Search = () => {
                     <th className="py-3.5 w-16 text-center">
                       <Clock className="w-4 h-4 mx-auto" />
                     </th>
+                    <th className="py-3.5 w-12 text-center"></th>
                   </tr>
                 </thead>
                 <tbody className="before:block before:h-2">
@@ -310,8 +311,26 @@ const Search = () => {
                         <td className="py-3 text-sm hidden sm:table-cell truncate max-w-[150px] font-medium text-zinc-400">{item.album}</td>
 
                         {/* Track Duration */}
-                        <td className="py-3 text-sm text-center font-semibold text-zinc-400 rounded-r-lg tabular-nums">
+                        <td className="py-3 text-sm text-center font-semibold text-zinc-400 tabular-nums">
                           {item.duration}
+                        </td>
+
+                        {/* Add to Playlist */}
+                        <td className="py-3 text-center rounded-r-lg">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const mappedTrack = {
+                                _id: item.id,
+                                ...item
+                              };
+                              openPlaylistModal(mappedTrack);
+                            }}
+                            className="opacity-100 md:opacity-0 group-hover:opacity-100 w-7 h-7 rounded-full hover:bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white transition-all hover:scale-105 active:scale-95 cursor-pointer mx-auto"
+                            title="Add to Playlist"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
                         </td>
                       </tr>
                     );

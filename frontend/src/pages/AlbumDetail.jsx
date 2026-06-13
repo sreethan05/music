@@ -1,11 +1,11 @@
 import { useContext } from "react";
 import { useParams } from "react-router-dom";
 import { PlayerContext } from "../context/PlayerContext";
-import { Clock, Play, Pause } from "lucide-react";
+import { Clock, Play, Pause, Plus } from "lucide-react";
 
 const AlbumDetail = () => {
   const { id } = useParams();
-  const { songsData, albumsData, currentSong, playStatus, playWithId, togglePlay } = useContext(PlayerContext);
+  const { songsData, albumsData, currentSong, playStatus, playWithId, togglePlay, openPlaylistModal } = useContext(PlayerContext);
 
   const album = albumsData.find((a) => a._id === id);
   if (!album) {
@@ -79,6 +79,7 @@ const AlbumDetail = () => {
                 <th className="py-3.5 w-16 text-center">
                   <Clock className="w-4 h-4 mx-auto" />
                 </th>
+                <th className="py-3.5 w-12 text-center"></th>
               </tr>
             </thead>
             <tbody className="before:block before:h-2">
@@ -140,8 +141,22 @@ const AlbumDetail = () => {
                     </td>
 
                     {/* Duration */}
-                    <td className="py-3 text-sm text-center font-semibold text-zinc-400 rounded-r-lg tabular-nums">
+                    <td className="py-3 text-sm text-center font-semibold text-zinc-400 tabular-nums">
                       {item.duration || "3:00"}
+                    </td>
+
+                    {/* Add to Playlist */}
+                    <td className="py-3 text-center rounded-r-lg">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openPlaylistModal(item);
+                        }}
+                        className="opacity-100 md:opacity-0 group-hover:opacity-100 w-7 h-7 rounded-full hover:bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white transition-all hover:scale-105 active:scale-95 cursor-pointer mx-auto"
+                        title="Add to Playlist"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 );

@@ -13,6 +13,8 @@ import Search from "./pages/Search";
 import Auth from "./pages/Auth";
 import { PlayerContext } from "./context/PlayerContext";
 import { ShieldAlert } from "lucide-react";
+import FullScreenPlayer from "./components/FullScreenPlayer";
+import PlaylistSelectorModal from "./components/PlaylistSelectorModal";
 
 // Admin Protection Wrapper Component
 const AdminGuard = ({ children }) => {
@@ -102,6 +104,12 @@ function App() {
 
       {/* Mobile Bottom Navigation Bar (Mobile only) */}
       <MobileNavBar />
+
+      {/* Full-screen player, lyrics and visualizer overlay */}
+      <FullScreenPlayer />
+
+      {/* Playlist Selector Modal overlay */}
+      <PlaylistSelectorModal />
     </div>
   );
 }
