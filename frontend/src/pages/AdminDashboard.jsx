@@ -158,10 +158,6 @@ const AdminDashboard = () => {
   return (
     <div className="flex-1 h-full overflow-y-auto pb-28 bg-theme-bg flex flex-col no-scrollbar relative select-none overflow-hidden transition-colors duration-300">
       
-      {/* Ambient background glows */}
-      <div className="ambient-glow top-0 right-1/4 opacity-40" />
-      <div className="ambient-glow-purple bottom-10 left-10 opacity-30" />
-
       {/* Toast Notification */}
       {notification.show && (
         <div className={`fixed top-6 right-6 z-50 flex items-center gap-3.5 px-5 py-3.5 rounded-xl shadow-2xl text-white border backdrop-blur-md transition-all duration-300 transform translate-y-0 ${
@@ -183,8 +179,8 @@ const AdminDashboard = () => {
         {/* Statistics Section */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="glass-panel p-5 rounded-2xl border border-white/5 relative overflow-hidden flex items-center gap-4.5 shadow-lg group hover:border-white/10 transition-all duration-300">
-            <div className="absolute inset-0 bg-gradient-to-tr from-spotify-green/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <div className="w-12 h-12 rounded-xl bg-spotify-green/10 border border-spotify-green/20 flex items-center justify-center text-spotify-green shadow-inner">
+            <div className="absolute inset-0 bg-gradient-to-tr from-sky-400/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="w-12 h-12 rounded-xl bg-sky-400/10 border border-sky-400/20 flex items-center justify-center text-sky-400 shadow-inner">
               <Disc className="w-6 h-6 animate-[spin_5s_linear_infinite]" />
             </div>
             <div>
@@ -229,7 +225,7 @@ const AdminDashboard = () => {
               onClick={() => setActiveTab("add-song")}
               className={`flex items-center gap-3 w-full px-4 py-3.5 rounded-xl text-xs font-bold tracking-wide transition-all duration-300 cursor-pointer ${
                 activeTab === "add-song" 
-                  ? "bg-spotify-green text-black shadow-lg shadow-spotify-green/20 hover:scale-101 active:scale-99" 
+                  ? "bg-sky-400 text-black shadow-lg shadow-sky-400/20 hover:scale-[1.01] active:scale-[0.99]" 
                   : "text-zinc-400 hover:bg-white/[0.03] hover:text-white"
               }`}
             >
@@ -240,7 +236,7 @@ const AdminDashboard = () => {
               onClick={() => setActiveTab("list-songs")}
               className={`flex items-center gap-3 w-full px-4 py-3.5 rounded-xl text-xs font-bold tracking-wide transition-all duration-300 cursor-pointer ${
                 activeTab === "list-songs" 
-                  ? "bg-spotify-green text-black shadow-lg shadow-spotify-green/20 hover:scale-101 active:scale-99" 
+                  ? "bg-sky-400 text-black shadow-lg shadow-sky-400/20 hover:scale-[1.01] active:scale-[0.99]" 
                   : "text-zinc-400 hover:bg-white/[0.03] hover:text-white"
               }`}
             >
@@ -251,7 +247,7 @@ const AdminDashboard = () => {
               onClick={() => setActiveTab("add-album")}
               className={`flex items-center gap-3 w-full px-4 py-3.5 rounded-xl text-xs font-bold tracking-wide transition-all duration-300 cursor-pointer ${
                 activeTab === "add-album" 
-                  ? "bg-spotify-green text-black shadow-lg shadow-spotify-green/20 hover:scale-101 active:scale-99" 
+                  ? "bg-sky-400 text-black shadow-lg shadow-sky-400/20 hover:scale-[1.01] active:scale-[0.99]" 
                   : "text-zinc-400 hover:bg-white/[0.03] hover:text-white"
               }`}
             >
@@ -262,7 +258,7 @@ const AdminDashboard = () => {
               onClick={() => setActiveTab("list-albums")}
               className={`flex items-center gap-3 w-full px-4 py-3.5 rounded-xl text-xs font-bold tracking-wide transition-all duration-300 cursor-pointer ${
                 activeTab === "list-albums" 
-                  ? "bg-spotify-green text-black shadow-lg shadow-spotify-green/20 hover:scale-101 active:scale-99" 
+                  ? "bg-sky-400 text-black shadow-lg shadow-sky-400/20 hover:scale-[1.01] active:scale-[0.99]" 
                   : "text-zinc-400 hover:bg-white/[0.03] hover:text-white"
               }`}
             >
@@ -278,8 +274,8 @@ const AdminDashboard = () => {
             {loading && (
               <div className="absolute inset-0 bg-black/60 backdrop-blur-md z-40 flex items-center justify-center flex-col gap-3.5">
                 <div className="relative flex items-center justify-center">
-                  <div className="w-16 h-16 rounded-full border-4 border-spotify-green/10 border-t-spotify-green animate-spin" />
-                  <Loader2 className="w-6 h-6 text-spotify-green animate-spin absolute" />
+                  <div className="w-16 h-16 rounded-full border-4 border-sky-400/10 border-t-sky-400 animate-spin" />
+                  <Loader2 className="w-6 h-6 text-sky-400 animate-spin absolute" />
                 </div>
                 <span className="text-white text-xs font-bold tracking-widest uppercase">Processing Upload...</span>
               </div>
@@ -297,8 +293,8 @@ const AdminDashboard = () => {
                   {/* Audio Upload */}
                   <div className="flex-1">
                     <label className="text-xs font-bold tracking-wide block mb-2 text-zinc-400 uppercase">Song Audio File (.mp3)</label>
-                    <label className="flex flex-col items-center justify-center border border-dashed border-white/10 rounded-xl p-5 hover:border-spotify-green/50 hover:bg-white/[0.01] cursor-pointer transition-all duration-300">
-                      <UploadCloud className="w-7 h-7 text-zinc-500 mb-2 group-hover:text-spotify-green" />
+                    <label className="flex flex-col items-center justify-center border border-dashed border-white/10 rounded-xl p-5 hover:border-sky-400/50 hover:bg-white/[0.01] cursor-pointer transition-all duration-300">
+                      <UploadCloud className="w-7 h-7 text-zinc-500 mb-2 group-hover:text-sky-400" />
                       <span className="text-xs text-center font-semibold text-zinc-400 truncate max-w-[200px]">
                         {songAudioFile ? songAudioFile.name : "Select MP3 Audio File"}
                       </span>
@@ -314,7 +310,7 @@ const AdminDashboard = () => {
                   {/* Cover Image Upload */}
                   <div className="flex-1">
                     <label className="text-xs font-bold tracking-wide block mb-2 text-zinc-400 uppercase">Song Cover Image</label>
-                    <label className="flex flex-col items-center justify-center border border-dashed border-white/10 rounded-xl p-5 hover:border-spotify-green/50 hover:bg-white/[0.01] cursor-pointer transition-all duration-300">
+                    <label className="flex flex-col items-center justify-center border border-dashed border-white/10 rounded-xl p-5 hover:border-sky-400/50 hover:bg-white/[0.01] cursor-pointer transition-all duration-300">
                       {songImageFile ? (
                         <img 
                           src={URL.createObjectURL(songImageFile)} 
@@ -345,7 +341,7 @@ const AdminDashboard = () => {
                       placeholder="e.g. Neon Nights" 
                       value={songName} 
                       onChange={(e) => setSongName(e.target.value)} 
-                      className="w-full glass-input p-3 rounded-xl text-xs text-white focus:outline-none focus:border-spotify-green transition-all" 
+                      className="w-full glass-input p-3 rounded-xl text-xs text-white focus:outline-none focus:border-sky-400 transition-all" 
                     />
                   </div>
                   <div>
@@ -353,7 +349,7 @@ const AdminDashboard = () => {
                     <select 
                       value={songAlbum} 
                       onChange={(e) => setSongAlbum(e.target.value)}
-                      className="w-full glass-input p-3 rounded-xl text-xs text-zinc-400 focus:outline-none focus:border-spotify-green transition-all cursor-pointer [&>option]:bg-zinc-950 [&>option]:text-white"
+                      className="w-full glass-input p-3 rounded-xl text-xs text-zinc-400 focus:outline-none focus:border-sky-400 transition-all cursor-pointer [&>option]:bg-zinc-950 [&>option]:text-white"
                     >
                       <option value="">-- Choose Album --</option>
                       <option value="None">None (Single)</option>
@@ -371,13 +367,13 @@ const AdminDashboard = () => {
                     placeholder="Tell listeners what this song is about..." 
                     value={songDesc} 
                     onChange={(e) => setSongDesc(e.target.value)} 
-                    className="w-full glass-input p-3 rounded-xl text-xs text-white focus:outline-none focus:border-spotify-green transition-all resize-none"
+                    className="w-full glass-input p-3 rounded-xl text-xs text-white focus:outline-none focus:border-sky-400 transition-all resize-none"
                   />
                 </div>
 
                 <button 
                   type="submit" 
-                  className="w-fit self-start px-7 py-3 bg-spotify-green text-black font-extrabold text-xs rounded-full hover:scale-105 active:scale-95 transition-transform duration-200 cursor-pointer shadow-lg shadow-spotify-green/10"
+                  className="w-fit self-start px-7 py-3 bg-sky-400 text-black font-extrabold text-xs rounded-full hover:scale-105 active:scale-95 transition-transform duration-200 cursor-pointer shadow-lg shadow-sky-400/10"
                 >
                   Add Song
                 </button>
@@ -396,7 +392,7 @@ const AdminDashboard = () => {
                   {/* Image Upload */}
                   <div className="flex-1">
                     <label className="text-xs font-bold tracking-wide block mb-2 text-zinc-400 uppercase">Album Cover Image</label>
-                    <label className="flex flex-col items-center justify-center border border-dashed border-white/10 rounded-xl p-5 hover:border-spotify-green/50 hover:bg-white/[0.01] cursor-pointer transition-all duration-300 h-[110px]">
+                    <label className="flex flex-col items-center justify-center border border-dashed border-white/10 rounded-xl p-5 hover:border-sky-400/50 hover:bg-white/[0.01] cursor-pointer transition-all duration-300 h-[110px]">
                       {albumImageFile ? (
                         <img 
                           src={URL.createObjectURL(albumImageFile)} 
@@ -444,7 +440,7 @@ const AdminDashboard = () => {
                       placeholder="e.g. Chill Vibes" 
                       value={albumName} 
                       onChange={(e) => setAlbumName(e.target.value)} 
-                      className="w-full glass-input p-3 rounded-xl text-xs text-white focus:outline-none focus:border-spotify-green transition-all" 
+                      className="w-full glass-input p-3 rounded-xl text-xs text-white focus:outline-none focus:border-sky-400 transition-all" 
                     />
                   </div>
                 </div>
@@ -456,13 +452,13 @@ const AdminDashboard = () => {
                     placeholder="e.g. Chill instrumentals and acoustic melodies to relax..." 
                     value={albumDesc} 
                     onChange={(e) => setAlbumDesc(e.target.value)} 
-                    className="w-full glass-input p-3 rounded-xl text-xs text-white focus:outline-none focus:border-spotify-green transition-all resize-none"
+                    className="w-full glass-input p-3 rounded-xl text-xs text-white focus:outline-none focus:border-sky-400 transition-all resize-none"
                   />
                 </div>
 
                 <button 
                   type="submit" 
-                  className="w-fit self-start px-7 py-3 bg-spotify-green text-black font-extrabold text-xs rounded-full hover:scale-105 active:scale-95 transition-transform duration-200 cursor-pointer shadow-lg shadow-spotify-green/10"
+                  className="w-fit self-start px-7 py-3 bg-sky-400 text-black font-extrabold text-xs rounded-full hover:scale-105 active:scale-95 transition-transform duration-200 cursor-pointer shadow-lg shadow-sky-400/10"
                 >
                   Add Album
                 </button>

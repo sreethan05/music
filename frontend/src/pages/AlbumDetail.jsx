@@ -31,33 +31,30 @@ const AlbumDetail = () => {
   return (
     <div className="flex-1 h-full overflow-y-auto pb-36 md:pb-28 bg-theme-bg no-scrollbar relative overflow-hidden transition-colors duration-300">
       
-      {/* Ambient backgrounds */}
-      <div className="ambient-glow top-0 left-1/4 opacity-40" />
-
       {/* Album Header Banner with dynamic background color */}
       <div 
         className="px-6 pt-6 pb-10 flex flex-col md:flex-row items-end gap-8 select-none relative z-10"
         style={{
-          background: `linear-gradient(to bottom, ${album.bgColour}22 0%, #09090b 100%)`
+          background: `linear-gradient(to bottom, ${album.bgColour}22 0%, var(--bg-primary) 100%)`
         }}
       >
         <div className="relative group cursor-pointer shadow-2xl rounded-lg overflow-hidden border border-white/15 hover:border-white/20 transition-all duration-300">
           <img 
             src={album.image} 
             alt={album.name} 
-            className="w-48 h-48 md:w-56 md:h-56 object-cover group-hover:scale-103 transition-transform duration-500" 
+            className="w-48 h-48 md:w-56 md:h-56 object-cover group-hover:scale-[1.03] transition-transform duration-500" 
           />
           <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         </div>
         
-        <div className="flex flex-col gap-2 text-white pb-1">
-          <span className="text-[10px] uppercase font-bold tracking-widest text-spotify-green bg-spotify-green/10 px-2.5 py-1 rounded-full w-fit border border-spotify-green/20">Playlist</span>
+        <div className="flex flex-col gap-2 text-theme-text pb-1">
+          <span className="text-[10px] uppercase font-bold tracking-widest text-sky-400 bg-sky-400/10 px-2.5 py-1 rounded-full w-fit border border-sky-400/20">Playlist</span>
           <h1 className="text-3xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mt-2 glow-text">{album.name}</h1>
-          <p className="text-xs md:text-sm text-zinc-400 font-medium leading-relaxed max-w-2xl mt-2">{album.desc}</p>
-          <div className="flex items-center gap-2 text-xs font-semibold mt-3 text-zinc-300">
-            <span className="hover:text-white cursor-pointer transition-colors">Music Vibe</span>
-            <span className="text-zinc-600">•</span>
-            <span className="text-zinc-400">{albumSongs.length} {albumSongs.length === 1 ? 'song' : 'songs'}</span>
+          <p className="text-xs md:text-sm text-theme-zinc font-medium leading-relaxed max-w-2xl mt-2">{album.desc}</p>
+          <div className="flex items-center gap-2 text-xs font-semibold mt-3 text-theme-zinc">
+            <span className="hover:text-theme-text cursor-pointer transition-colors">Music Vibe</span>
+            <span className="text-theme-muted">•</span>
+            <span className="text-theme-zinc">{albumSongs.length} {albumSongs.length === 1 ? 'song' : 'songs'}</span>
           </div>
         </div>
       </div>
@@ -91,7 +88,7 @@ const AlbumDetail = () => {
                   <tr 
                     key={item._id}
                     onClick={() => handleRowClick(item._id)}
-                    className={`rounded-lg hover:bg-theme-border transition-all duration-350 group cursor-pointer ${isActive ? 'bg-theme-card' : ''}`}
+                    className={`rounded-lg hover:bg-theme-border transition-all duration-300 group cursor-pointer ${isActive ? 'bg-theme-card' : ''}`}
                   >
                     {/* Index or Play Button */}
                     <td className="py-3 text-center text-sm font-semibold rounded-l-lg">
@@ -105,7 +102,7 @@ const AlbumDetail = () => {
                               <span className="playing-bar"></span>
                             </div>
                           ) : (
-                            <span className={isActive ? "text-spotify-green" : "text-theme-zinc"}>{index + 1}</span>
+                            <span className={isActive ? "text-sky-400" : "text-theme-zinc"}>{index + 1}</span>
                           )}
                         </span>
                         <span className="absolute opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200">
@@ -126,7 +123,7 @@ const AlbumDetail = () => {
                         className="w-10.5 h-10.5 rounded object-cover shadow-md border border-theme-border" 
                       />
                       <div className="flex flex-col overflow-hidden max-w-[200px] md:max-w-[400px]">
-                        <span className={`text-sm font-semibold truncate ${isActive ? "text-spotify-green glow-text" : "text-theme-text"}`}>
+                        <span className={`text-sm font-semibold truncate ${isActive ? "text-sky-400 glow-text" : "text-theme-text"}`}>
                           {item.name}
                         </span>
                         <span className="text-xs text-theme-zinc truncate mt-0.5 font-medium">
@@ -136,12 +133,12 @@ const AlbumDetail = () => {
                     </td>
 
                     {/* Album Name */}
-                    <td className="py-3 text-sm hidden sm:table-cell truncate max-w-[150px] font-medium text-zinc-400">
+                    <td className="py-3 text-sm hidden sm:table-cell truncate max-w-[150px] font-medium text-theme-zinc">
                       {item.album}
                     </td>
 
                     {/* Duration */}
-                    <td className="py-3 text-sm text-center font-semibold text-zinc-400 tabular-nums">
+                    <td className="py-3 text-sm text-center font-semibold text-theme-zinc tabular-nums">
                       {item.duration || "3:00"}
                     </td>
 
@@ -152,7 +149,7 @@ const AlbumDetail = () => {
                           e.stopPropagation();
                           openPlaylistModal(item);
                         }}
-                        className="opacity-100 md:opacity-0 group-hover:opacity-100 w-7 h-7 rounded-full hover:bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white transition-all hover:scale-105 active:scale-95 cursor-pointer mx-auto"
+                        className="opacity-100 md:opacity-0 group-hover:opacity-100 w-7 h-7 rounded-full hover:bg-theme-border flex items-center justify-center text-theme-zinc hover:text-theme-text transition-all hover:scale-105 active:scale-95 cursor-pointer mx-auto"
                         title="Add to Playlist"
                       >
                         <Plus className="w-4 h-4" />

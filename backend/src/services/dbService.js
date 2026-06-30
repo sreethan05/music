@@ -7,30 +7,50 @@ import userModel from '../models/userModel.js';
 
 const dbPath = path.resolve('db.json');
 
-const initLocalDb = () => {
-  if (!fs.existsSync(dbPath)) {
-    fs.writeFileSync(dbPath, JSON.stringify({ albums: [], songs: [], users: [] }, null, 2));
-  } else {
+// Transaction queue to serialize concurrent write operations
+let writeQueue = Promise.resolve();
+
+const queueTransaction = (fn) => {
+  const result = writeQueue.then(async () => {
+    return fn();
+  });
+  writeQueue = result.catch(() => {});
+  return result;
+};
+
+const writeLocalDbAtomic = async (data) => {
+  const tempPath = `${dbPath}.tmp`;
+  try {
+    await fs.promises.writeFile(tempPath, JSON.stringify(data, null, 2), 'utf-8');
+    await fs.promises.rename(tempPath, dbPath);
+  } catch (error) {
+    console.error("Atomic write to local DB failed:", error);
     try {
-      const data = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
-      if (!data.users) {
-        data.users = [];
-        fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
-      }
-    } catch (e) {
-      console.error("Local DB read failed during initialization, resetting users:", e);
-    }
+      await fs.promises.unlink(tempPath);
+    } catch (_) {}
+    throw error;
   }
 };
 
-const readLocalDb = () => {
-  initLocalDb();
-  const data = fs.readFileSync(dbPath, 'utf-8');
-  return JSON.parse(data);
+const initLocalDbAsync = async () => {
+  try {
+    await fs.promises.access(dbPath);
+    const content = await fs.promises.readFile(dbPath, 'utf-8');
+    const data = JSON.parse(content);
+    if (!data.users) {
+      data.users = [];
+      await writeLocalDbAtomic(data);
+    }
+  } catch (err) {
+    // File doesn't exist or is invalid JSON; initialize new structure
+    await writeLocalDbAtomic({ albums: [], songs: [], users: [] });
+  }
 };
 
-const writeLocalDb = (data) => {
-  fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
+const readLocalDb = async () => {
+  await initLocalDbAsync();
+  const data = await fs.promises.readFile(dbPath, 'utf-8');
+  return JSON.parse(data);
 };
 
 const isMongoEnabled = () => {
@@ -41,7 +61,7 @@ export const getAlbums = async () => {
   if (isMongoEnabled()) {
     return await albumModel.find({});
   } else {
-    return readLocalDb().albums;
+    return (await readLocalDb()).albums;
   }
 };
 
@@ -50,14 +70,16 @@ export const createAlbum = async (albumData) => {
     const album = new albumModel(albumData);
     return await album.save();
   } else {
-    const db = readLocalDb();
-    const newAlbum = {
-      _id: 'album_' + Date.now(),
-      ...albumData
-    };
-    db.albums.push(newAlbum);
-    writeLocalDb(db);
-    return newAlbum;
+    return queueTransaction(async () => {
+      const db = await readLocalDb();
+      const newAlbum = {
+        _id: 'album_' + Date.now(),
+        ...albumData
+      };
+      db.albums.push(newAlbum);
+      await writeLocalDbAtomic(db);
+      return newAlbum;
+    });
   }
 };
 
@@ -65,10 +87,12 @@ export const deleteAlbum = async (id) => {
   if (isMongoEnabled()) {
     return await albumModel.findByIdAndDelete(id);
   } else {
-    const db = readLocalDb();
-    db.albums = db.albums.filter(a => a._id !== id);
-    writeLocalDb(db);
-    return { success: true };
+    return queueTransaction(async () => {
+      const db = await readLocalDb();
+      db.albums = db.albums.filter(a => a._id !== id);
+      await writeLocalDbAtomic(db);
+      return { success: true };
+    });
   }
 };
 
@@ -76,7 +100,7 @@ export const getSongs = async () => {
   if (isMongoEnabled()) {
     return await songModel.find({});
   } else {
-    return readLocalDb().songs;
+    return (await readLocalDb()).songs;
   }
 };
 
@@ -85,14 +109,16 @@ export const createSong = async (songData) => {
     const song = new songModel(songData);
     return await song.save();
   } else {
-    const db = readLocalDb();
-    const newSong = {
-      _id: 'song_' + Date.now(),
-      ...songData
-    };
-    db.songs.push(newSong);
-    writeLocalDb(db);
-    return newSong;
+    return queueTransaction(async () => {
+      const db = await readLocalDb();
+      const newSong = {
+        _id: 'song_' + Date.now(),
+        ...songData
+      };
+      db.songs.push(newSong);
+      await writeLocalDbAtomic(db);
+      return newSong;
+    });
   }
 };
 
@@ -100,10 +126,12 @@ export const deleteSong = async (id) => {
   if (isMongoEnabled()) {
     return await songModel.findByIdAndDelete(id);
   } else {
-    const db = readLocalDb();
-    db.songs = db.songs.filter(s => s._id !== id);
-    writeLocalDb(db);
-    return { success: true };
+    return queueTransaction(async () => {
+      const db = await readLocalDb();
+      db.songs = db.songs.filter(s => s._id !== id);
+      await writeLocalDbAtomic(db);
+      return { success: true };
+    });
   }
 };
 
@@ -111,7 +139,7 @@ export const getUserByEmail = async (email) => {
   if (isMongoEnabled()) {
     return await userModel.findOne({ email });
   } else {
-    const db = readLocalDb();
+    const db = await readLocalDb();
     return db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
   }
 };
@@ -121,14 +149,16 @@ export const createUser = async (userData) => {
     const user = new userModel(userData);
     return await user.save();
   } else {
-    const db = readLocalDb();
-    const newUser = {
-      _id: 'user_' + Date.now(),
-      ...userData
-    };
-    db.users.push(newUser);
-    writeLocalDb(db);
-    return newUser;
+    return queueTransaction(async () => {
+      const db = await readLocalDb();
+      const newUser = {
+        _id: 'user_' + Date.now(),
+        ...userData
+      };
+      db.users.push(newUser);
+      await writeLocalDbAtomic(db);
+      return newUser;
+    });
   }
 };
 
@@ -136,7 +166,7 @@ export const getUserById = async (id) => {
   if (isMongoEnabled()) {
     return await userModel.findById(id);
   } else {
-    const db = readLocalDb();
+    const db = await readLocalDb();
     return db.users.find(u => u._id === id);
   }
 };

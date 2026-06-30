@@ -30,3 +30,7 @@ frontend/.env
 frontend/dist/
 dist/
 build/
+
+# Scratch/import artifacts
+script_block_*.js
+spotify_response*.html

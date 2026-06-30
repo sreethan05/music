@@ -5,55 +5,7 @@ import API_URL from "../config/api";
 
 export const PlayerContext = createContext();
 
-const DEMO_TOKEN = "music-vibe-demo-session";
 const FALLBACK_COVER = "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop&q=70";
-
-const fallbackAlbums = [
-  {
-    _id: "fallback_album_telugu",
-    name: "Telugu Melodies",
-    desc: "Warm Telugu favorites for late-night listening.",
-    bgColour: "#0284c7",
-    image: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop&q=70"
-  },
-  {
-    _id: "fallback_album_bollywood",
-    name: "Bollywood Hits",
-    desc: "Bright Hindi cinema-inspired pop and romance.",
-    bgColour: "#b91c1c",
-    image: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&auto=format&fit=crop&q=70"
-  },
-  {
-    _id: "fallback_album_pop",
-    name: "English Pop",
-    desc: "Clean, upbeat pop cuts for a polished demo.",
-    bgColour: "#0f766e",
-    image: "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&auto=format&fit=crop&q=70"
-  }
-];
-
-const fallbackSongs = [
-  ["demo_song_1", "Naa Madhi", "Soulful Telugu-inspired melody", "Telugu Melodies", "4:12", 1],
-  ["demo_song_2", "Kesariya Nights", "Acoustic Hindi romance blend", "Bollywood Hits", "3:48", 2],
-  ["demo_song_3", "Neon Pulse", "Retro synth pop groove", "English Pop", "3:36", 3],
-  ["demo_song_4", "Samayama", "Soft piano and strings ballad", "Telugu Melodies", "4:01", 4],
-  ["demo_song_5", "Chaleya Drift", "Dance-pop rhythm with warm vocals", "Bollywood Hits", "3:29", 5],
-  ["demo_song_6", "Midnight Signal", "Late-night electronic pop", "English Pop", "3:54", 6],
-  ["demo_song_7", "Srivalli Acoustic", "Gentle acoustic folk-pop", "Telugu Melodies", "4:18", 7],
-  ["demo_song_8", "Kabira Sky", "Sufi-rock inspired unplugged cut", "Bollywood Hits", "4:05", 8],
-  ["demo_song_9", "Golden Hour", "Bright indie-pop drive", "English Pop", "3:42", 9],
-  ["demo_song_10", "Aradhya", "Sunny romantic duet energy", "Telugu Melodies", "3:57", 10],
-  ["demo_song_11", "Raataan Lofi", "Soft lofi bedroom-pop edit", "Bollywood Hits", "3:33", 11],
-  ["demo_song_12", "Velvet Run", "Funky disco-pop pulse", "English Pop", "3:46", 12]
-].map(([id, name, desc, album, duration, helixIndex], idx) => ({
-  _id: id,
-  name,
-  desc,
-  album,
-  duration,
-  image: fallbackAlbums[idx % fallbackAlbums.length].image,
-  file: `https://www.soundhelix.com/examples/mp3/SoundHelix-Song-${helixIndex}.mp3`
-}));
 
 const extractDominantColor = (imageUrl) => {
   return new Promise((resolve) => {
@@ -104,11 +56,118 @@ const PlayerContextProvider = (props) => {
   const audioContextRef = useRef(null);
   const sourceRef = useRef(null);
   const filtersRef = useRef([]);
+  const analyserRef = useRef(null);
   const [eqPreset, setEqPreset] = useState("flat");
+  const [eqGains, setEqGains] = useState([0, 0, 0, 0, 0]);
   
   const [sleepTimer, setSleepTimer] = useState(null); // in seconds
   const sleepTimerRef = useRef(null);
   const fadeIntervalRef = useRef(null);
+
+  // Web Audio Advanced DSP Refs
+  const karaokeInputRef = useRef(null);
+  const karaokeDryGainRef = useRef(null);
+  const karaokeWetGainRef = useRef(null);
+  const spatialInputRef = useRef(null);
+  const spatialDryGainRef = useRef(null);
+  const spatialWetGainRef = useRef(null);
+  const convolverRef = useRef(null);
+
+  // Advanced DSP States
+  const [spatialPreset, setSpatialPreset] = useState("none");
+  const [karaokeEnabled, setKaraokeEnabled] = useState(false);
+  const [crossfade, setCrossfade] = useState(3); // transition fading duration in seconds
+
+  const [customLyrics, setCustomLyrics] = useState(() => {
+    try {
+      const saved = localStorage.getItem('custom_lyrics');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const generateReverbImpulse = (ctx, preset) => {
+    let duration;
+    let decay;
+    
+    switch (preset) {
+      case "concert":
+        duration = 2.5; decay = 2.0;
+        break;
+      case "cathedral":
+        duration = 4.0; decay = 1.5;
+        break;
+      case "cave":
+        duration = 3.0; decay = 1.0;
+        break;
+      case "club":
+        duration = 1.0; decay = 3.0;
+        break;
+      case "bathroom":
+        duration = 0.6; decay = 1.8;
+        break;
+      default:
+        return null;
+    }
+
+    const sampleRate = ctx.sampleRate;
+    const length = sampleRate * duration;
+    const impulse = ctx.createBuffer(2, length, sampleRate);
+    const left = impulse.getChannelData(0);
+    const right = impulse.getChannelData(1);
+
+    for (let i = 0; i < length; i++) {
+      const percent = i / length;
+      const val = (Math.random() * 2 - 1) * Math.pow(1 - percent, decay);
+      left[i] = val;
+      right[i] = val;
+    }
+    return impulse;
+  };
+
+  const applySpatialPreset = (presetName) => {
+    setSpatialPreset(presetName);
+    initAudioContext();
+
+    const ctx = audioContextRef.current;
+    if (ctx && spatialDryGainRef.current && spatialWetGainRef.current && convolverRef.current) {
+      if (presetName === "none") {
+        spatialDryGainRef.current.gain.setValueAtTime(1.0, ctx.currentTime);
+        spatialWetGainRef.current.gain.setValueAtTime(0.0, ctx.currentTime);
+      } else {
+        const buffer = generateReverbImpulse(ctx, presetName);
+        convolverRef.current.buffer = buffer;
+        spatialDryGainRef.current.gain.setValueAtTime(0.65, ctx.currentTime);
+        spatialWetGainRef.current.gain.setValueAtTime(0.75, ctx.currentTime);
+      }
+    }
+  };
+
+  const toggleKaraoke = () => {
+    const nextVal = !karaokeEnabled;
+    setKaraokeEnabled(nextVal);
+    initAudioContext();
+
+    const ctx = audioContextRef.current;
+    if (ctx && karaokeDryGainRef.current && karaokeWetGainRef.current) {
+      if (nextVal) {
+        karaokeDryGainRef.current.gain.setValueAtTime(0.0, ctx.currentTime);
+        karaokeWetGainRef.current.gain.setValueAtTime(1.0, ctx.currentTime);
+      } else {
+        karaokeDryGainRef.current.gain.setValueAtTime(1.0, ctx.currentTime);
+        karaokeWetGainRef.current.gain.setValueAtTime(0.0, ctx.currentTime);
+      }
+    }
+  };
+
+  const saveCustomLyrics = (songId, timedLyricsArray) => {
+    setCustomLyrics(prev => {
+      const updated = { ...prev, [songId]: timedLyricsArray };
+      localStorage.setItem('custom_lyrics', JSON.stringify(updated));
+      return updated;
+    });
+  };
 
   const [songsData, setSongsData] = useState([]);
   const [albumsData, setAlbumsData] = useState([]);
@@ -134,6 +193,16 @@ const PlayerContextProvider = (props) => {
   const closePlaylistModal = () => {
     setPlaylistModalSong(null);
     setPlaylistModalOpen(false);
+  };
+
+  const [importModalOpen, setImportModalOpen] = useState(false);
+
+  const openImportModal = () => {
+    setImportModalOpen(true);
+  };
+
+  const closeImportModal = () => {
+    setImportModalOpen(false);
   };
 
   const addSongToPlaylist = async (song, playlistId) => {
@@ -341,16 +410,6 @@ const PlayerContextProvider = (props) => {
     });
   };
 
-  const loadFallbackLibrary = (message = "Live library is warming up, so demo tracks are ready now.") => {
-    setAlbumsData(fallbackAlbums);
-    setSongsData(fallbackSongs);
-    setCurrentQueue(fallbackSongs);
-    setLibraryError(message);
-    if (!currentSongRef.current && fallbackSongs.length > 0) {
-      setCurrentSong(fallbackSongs[0]);
-      audioRef.current.src = fallbackSongs[0].file;
-    }
-  };
 
   useEffect(() => {
     // Set CORS for Audio element so Web Audio API works without CORS errors
@@ -411,7 +470,10 @@ const PlayerContextProvider = (props) => {
       }
     } catch (error) {
       console.error("Error loading library data from backend:", error);
-      loadFallbackLibrary();
+      setLibraryError("Database connection failed. Please ensure the backend server is running and database is accessible.");
+      setAlbumsData([]);
+      setSongsData([]);
+      setCurrentQueue([]);
     } finally {
       setIsLibraryLoading(false);
     }
@@ -424,11 +486,9 @@ const PlayerContextProvider = (props) => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Sync active token & verify session
   useEffect(() => {
     const verifySession = async () => {
       const savedToken = localStorage.getItem('token');
-      if (savedToken === DEMO_TOKEN) return;
       if (savedToken) {
         try {
           const res = await axios.get(`${API_URL}/api/auth/profile`, {
@@ -458,7 +518,7 @@ const PlayerContextProvider = (props) => {
         setUser(res.data.user);
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('user', JSON.stringify(res.data.user));
-        return { success: true };
+        return { success: true, user: res.data.user };
       }
       return { success: false, message: res.data.message };
     } catch (err) {
@@ -475,7 +535,7 @@ const PlayerContextProvider = (props) => {
         setUser(res.data.user);
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('user', JSON.stringify(res.data.user));
-        return { success: true };
+        return { success: true, user: res.data.user };
       }
       return { success: false, message: res.data.message };
     } catch (err) {
@@ -495,26 +555,6 @@ const PlayerContextProvider = (props) => {
     }
   }
 
-  const enterDemoMode = () => {
-    const demoUser = {
-      _id: "demo_user",
-      name: "Demo Listener",
-      email: "demo@musicvibe.app",
-      role: "listener",
-      isDemo: true
-    };
-    setToken(DEMO_TOKEN);
-    setUser(demoUser);
-    try {
-      localStorage.setItem('token', DEMO_TOKEN);
-      localStorage.setItem('user', JSON.stringify(demoUser));
-    } catch (e) {
-      console.error("Failed to save demo session:", e);
-    }
-    if (songsDataRef.current.length === 0) {
-      loadFallbackLibrary("Demo mode is ready with sample tracks while the live catalog connects.");
-    }
-  };
 
   const createPlaylist = async (name, tracks) => {
     if (!tracks || tracks.length === 0) return { success: false, message: "No tracks to add." };
@@ -602,6 +642,10 @@ const PlayerContextProvider = (props) => {
       const ctx = new AudioContextClass();
       audioContextRef.current = ctx;
 
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 64; // 32 frequency bins, ideal for lightweight visualizer
+      analyserRef.current = analyser;
+
       // 5 frequency bands: 60Hz, 230Hz, 910Hz, 4kHz, 14kHz
       const freqs = [60, 230, 910, 4000, 14000];
       const filters = freqs.map((freq, idx) => {
@@ -609,21 +653,102 @@ const PlayerContextProvider = (props) => {
         filter.type = idx === 0 ? "lowshelf" : idx === freqs.length - 1 ? "highshelf" : "peaking";
         filter.frequency.value = freq;
         filter.Q.value = 1.0;
-        filter.gain.value = 0;
+        filter.gain.value = eqGains[idx]; // Start with current manual gains
         return filter;
       });
 
       filtersRef.current = filters;
 
+      // 3. Karaoke Nodes (Vocal Attenuation)
+      const kInput = ctx.createGain();
+      const kOutput = ctx.createGain();
+      const kDry = ctx.createGain();
+      const kWet = ctx.createGain();
+      
+      const kLowPass = ctx.createBiquadFilter();
+      kLowPass.type = "lowpass";
+      kLowPass.frequency.value = 200; // Low bass bypasses cancellation
+
+      const kHighPass = ctx.createBiquadFilter();
+      kHighPass.type = "highpass";
+      kHighPass.frequency.value = 200;
+
+      const kSplitter = ctx.createChannelSplitter(2);
+      const kMerger = ctx.createChannelMerger(2);
+      const kGainL = ctx.createGain();
+      const kGainR = ctx.createGain();
+      kGainL.gain.value = 0.5;
+      kGainR.gain.value = -0.5; // Invert right channel for L-R subtraction
+
+      // Connections inside Karaoke
+      kInput.connect(kDry);
+      kDry.connect(kOutput);
+
+      kInput.connect(kLowPass);
+      kLowPass.connect(kWet);
+
+      kInput.connect(kHighPass);
+      kHighPass.connect(kSplitter);
+      
+      kSplitter.connect(kGainL, 0); // Left channel
+      kGainL.connect(kMerger, 0, 0);
+      kGainL.connect(kMerger, 0, 1);
+
+      kSplitter.connect(kGainR, 1); // Right channel
+      kGainR.connect(kMerger, 0, 0);
+      kGainR.connect(kMerger, 0, 1);
+
+      kMerger.connect(kWet);
+      kWet.connect(kOutput);
+
+      // Save Karaoke refs
+      karaokeInputRef.current = kInput;
+      karaokeDryGainRef.current = kDry;
+      karaokeWetGainRef.current = kWet;
+      kDry.gain.value = karaokeEnabled ? 0.0 : 1.0;
+      kWet.gain.value = karaokeEnabled ? 1.0 : 0.0;
+
+      // 4. Spatial Audio (Reverb) Nodes
+      const sInput = ctx.createGain();
+      const sOutput = ctx.createGain();
+      const sDry = ctx.createGain();
+      const sWet = ctx.createGain();
+      const convolver = ctx.createConvolver();
+
+      sInput.connect(sDry);
+      sDry.connect(sOutput);
+
+      sInput.connect(convolver);
+      convolver.connect(sWet);
+      sWet.connect(sOutput);
+
+      spatialInputRef.current = sInput;
+      spatialDryGainRef.current = sDry;
+      spatialWetGainRef.current = sWet;
+      convolverRef.current = convolver;
+
+      // Set initial spatial preset Reverb buffer
+      sDry.gain.value = spatialPreset === "none" ? 1.0 : 0.65;
+      sWet.gain.value = spatialPreset === "none" ? 0.0 : 0.75;
+      if (spatialPreset !== "none") {
+        convolver.buffer = generateReverbImpulse(ctx, spatialPreset);
+      }
+
+      // Connect overall graph
       const source = ctx.createMediaElementSource(audioRef.current);
       sourceRef.current = source;
 
-      source.connect(filters[0]);
+      // Connect: Source -> Analyser -> Filter 0 -> ... -> Filter 4 -> Karaoke Input -> Karaoke Output -> Spatial Input -> Spatial Output -> Destination
+      source.connect(analyser);
+      analyser.connect(filters[0]);
       for (let i = 0; i < filters.length - 1; i++) {
         filters[i].connect(filters[i + 1]);
       }
-      filters[filters.length - 1].connect(ctx.destination);
-      console.log("Web Audio EQ initialized successfully.");
+      filters[filters.length - 1].connect(kInput);
+      kOutput.connect(sInput);
+      sOutput.connect(ctx.destination);
+
+      console.log("Web Audio EQ, Analyser & Advanced DSP initialized successfully.");
     } catch (e) {
       console.warn("Web Audio API blocked or not supported on this track/origin:", e);
     }
@@ -652,6 +777,28 @@ const PlayerContextProvider = (props) => {
           filter.gain.value = gains[idx];
         }
       });
+    }
+    setEqGains(gains);
+  };
+
+  const changeEqGain = (bandIdx, gainVal) => {
+    setEqPreset("custom");
+    initAudioContext();
+    const val = parseFloat(gainVal);
+
+    setEqGains(prev => {
+      const updated = [...prev];
+      updated[bandIdx] = val;
+      return updated;
+    });
+
+    if (filtersRef.current[bandIdx]) {
+      const ctx = audioContextRef.current;
+      if (ctx) {
+        filtersRef.current[bandIdx].gain.linearRampToValueAtTime(val, ctx.currentTime + 0.05);
+      } else {
+        filtersRef.current[bandIdx].gain.value = val;
+      }
     }
   };
 
@@ -706,8 +853,8 @@ const PlayerContextProvider = (props) => {
       fadeIntervalRef.current = null;
     }
 
-    // If no song is loaded or paused, play instantly without fading
-    if (!audioRef.current.src || audioRef.current.paused) {
+    // If crossfade is 0 or if no song is loaded or paused, play instantly without fading
+    if (crossfade === 0 || !audioRef.current.src || audioRef.current.paused) {
       if (queue) setCurrentQueue(queue);
       setCurrentSong(song);
       audioRef.current.src = song.file;
@@ -719,8 +866,14 @@ const PlayerContextProvider = (props) => {
     const targetVol = isMuted ? 0 : volume;
     let fadeOutVol = targetVol;
     
+    // Scale fade step sizes based on crossfade duration
+    const crossfadeTimeMs = crossfade * 1000;
+    const stepInterval = 40; // ms
+    const fadeOutSteps = Math.max(1, (crossfadeTimeMs / 2) / stepInterval);
+    const fadeOutStepVal = targetVol / fadeOutSteps;
+
     fadeIntervalRef.current = setInterval(() => {
-      fadeOutVol -= 0.08;
+      fadeOutVol -= fadeOutStepVal;
       if (fadeOutVol <= 0) {
         clearInterval(fadeIntervalRef.current);
         audioRef.current.volume = 0;
@@ -741,8 +894,11 @@ const PlayerContextProvider = (props) => {
               
               let fadeInVol = 0;
               audioRef.current.volume = 0;
+              const fadeInSteps = Math.max(1, (crossfadeTimeMs / 2) / stepInterval);
+              const fadeInStepVal = targetVol / fadeInSteps;
+
               fadeIntervalRef.current = setInterval(() => {
-                fadeInVol += 0.08;
+                fadeInVol += fadeInStepVal;
                 if (fadeInVol >= targetVol) {
                   clearInterval(fadeIntervalRef.current);
                   fadeIntervalRef.current = null;
@@ -750,14 +906,14 @@ const PlayerContextProvider = (props) => {
                 } else {
                   audioRef.current.volume = fadeInVol;
                 }
-              }, 40);
+              }, stepInterval);
             })
             .catch(err => console.error("DJ Fade Playback failed:", err));
         }
       } else {
-        audioRef.current.volume = fadeOutVol;
+        audioRef.current.volume = Math.max(0, fadeOutVol);
       }
-    }, 40);
+    }, stepInterval);
   };
 
   const play = () => {
@@ -868,6 +1024,14 @@ const PlayerContextProvider = (props) => {
     setIsShuffle(!isShuffle);
   };
 
+  const removeFromQueue = (songId) => {
+    setCurrentQueue(prev => prev.filter(song => song._id !== songId));
+  };
+
+  const clearQueue = () => {
+    setCurrentQueue([]);
+  };
+
   const contextValue = {
     audioRef,
     seekBarRef,
@@ -888,9 +1052,10 @@ const PlayerContextProvider = (props) => {
     token,
     user,
     currentQueue,
+    removeFromQueue,
+    clearQueue,
     loginUser,
     registerUser,
-    enterDemoMode,
     logoutUser,
     createPlaylist,
     customPlaylists,
@@ -917,7 +1082,10 @@ const PlayerContextProvider = (props) => {
     isFullScreen,
     setIsFullScreen,
     eqPreset,
+    eqGains,
     applyEqPreset,
+    changeEqGain,
+    analyserRef,
     sleepTimer,
     startSleepTimer,
     recentlyPlayed,
@@ -925,10 +1093,21 @@ const PlayerContextProvider = (props) => {
     playlistModalSong,
     openPlaylistModal,
     closePlaylistModal,
+    importModalOpen,
+    openImportModal,
+    closeImportModal,
     addSongToPlaylist,
     removeSongFromPlaylist,
     createEmptyPlaylist,
-    deletePlaylist
+    deletePlaylist,
+    spatialPreset,
+    applySpatialPreset,
+    karaokeEnabled,
+    toggleKaraoke,
+    crossfade,
+    setCrossfade,
+    customLyrics,
+    saveCustomLyrics
   };
 
 

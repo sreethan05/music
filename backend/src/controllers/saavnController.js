@@ -30,11 +30,31 @@ const cleanHtmlEntities = (str) => {
     .replace(/&gt;/g, '>');
 };
 
+// Simple in-memory cache for JioSaavn search results with 5-minute TTL
+const searchCache = new Map();
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
 export const searchJioSaavn = async (req, res) => {
   try {
     const { query } = req.query;
     if (!query) {
       return res.status(400).json({ success: false, message: "Query parameter is required." });
+    }
+
+    const normalizedQuery = query.trim().toLowerCase();
+
+    // Check cache
+    if (searchCache.has(normalizedQuery)) {
+      const cached = searchCache.get(normalizedQuery);
+      if (Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        return res.status(200).json({
+          success: true,
+          data: cached.data,
+          fromCache: true
+        });
+      } else {
+        searchCache.delete(normalizedQuery);
+      }
     }
 
     // Call JioSaavn's internal autocomplete/search API
@@ -90,6 +110,12 @@ export const searchJioSaavn = async (req, res) => {
         };
       })
       .filter(song => song.file !== null); // Filter out any track that failed to decrypt
+
+    // Cache the formatted songs
+    searchCache.set(normalizedQuery, {
+      timestamp: Date.now(),
+      data: formattedSongs
+    });
 
     res.status(200).json({
       success: true,

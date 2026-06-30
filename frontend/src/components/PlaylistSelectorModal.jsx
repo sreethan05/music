@@ -63,7 +63,7 @@ const PlaylistSelectorModal = () => {
       onClick={closePlaylistModal}
     >
       <div 
-        className="w-full max-w-[400px] bg-slate-900/90 dark:bg-zinc-950/95 glass-panel border border-white/10 p-6 rounded-3xl flex flex-col max-h-[80vh] shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative text-white"
+        className="w-full max-w-[400px] bg-slate-900/92 dark:bg-zinc-950/95 glass-panel border border-white/10 p-6 rounded-2xl flex flex-col max-h-[80vh] shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative text-white"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
@@ -161,7 +161,7 @@ const PlaylistSelectorModal = () => {
             <button 
               type="submit"
               disabled={!newPlaylistName.trim()}
-              className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-slate-950 text-xs font-extrabold rounded-xl hover:scale-103 active:scale-97 disabled:scale-100 disabled:pointer-events-none transition-all cursor-pointer flex items-center gap-1 shrink-0"
+              className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-slate-950 text-xs font-extrabold rounded-xl hover:scale-[1.03] active:scale-[0.97] disabled:scale-100 disabled:pointer-events-none transition-all cursor-pointer flex items-center gap-1 shrink-0"
             >
               <Plus className="w-4 h-4 stroke-[3]" />
               <span>Create</span>

@@ -1,0 +1,1256 @@
+import { useState, useEffect, useRef, useCallback } from "react";
+
+// ─── Mock Data ────────────────────────────────────────────────────────────────
+
+const SONGS = [
+  { id: 1, title: "Midnight Glow", artist: "Luna Echo", album: "Neon Dreams", duration: "3:47", albumId: 1, cover: "🌙" },
+  { id: 2, title: "Electric Rain", artist: "Synth Pulse", album: "Static Fields", duration: "4:12", albumId: 2, cover: "⚡" },
+  { id: 3, title: "Glass Animals", artist: "Crystal Veil", album: "Neon Dreams", duration: "3:28", albumId: 1, cover: "🔮" },
+  { id: 4, title: "Orbit", artist: "Nova Drift", album: "Cosmos", duration: "5:01", albumId: 3, cover: "🪐" },
+  { id: 5, title: "Velvet Underground", artist: "Luna Echo", album: "Static Fields", duration: "3:55", albumId: 2, cover: "🎸" },
+  { id: 6, title: "Sakura Rain", artist: "Petal Echo", album: "Blossom", duration: "4:33", albumId: 4, cover: "🌸" },
+  { id: 7, title: "Phantom Signal", artist: "Synth Pulse", album: "Cosmos", duration: "3:19", albumId: 3, cover: "👻" },
+  { id: 8, title: "Cascade", artist: "Crystal Veil", album: "Blossom", duration: "4:07", albumId: 4, cover: "🌊" },
+  { id: 9, title: "Neon Haze", artist: "Nova Drift", album: "Neon Dreams", duration: "3:44", albumId: 1, cover: "🌈" },
+  { id: 10, title: "Solar Wind", artist: "Luna Echo", album: "Cosmos", duration: "5:22", albumId: 3, cover: "☀️" },
+  { id: 11, title: "Prism", artist: "Petal Echo", album: "Static Fields", duration: "3:38", albumId: 2, cover: "🔷" },
+  { id: 12, title: "Lost Signal", artist: "Synth Pulse", album: "Blossom", duration: "4:15", albumId: 4, cover: "📡" },
+];
+
+const ALBUMS = [
+  { id: 1, name: "Neon Dreams", artist: "Luna Echo", cover: "🌙", color: "#7C3AED" },
+  { id: 2, name: "Static Fields", artist: "Synth Pulse", cover: "⚡", color: "#00D4FF" },
+  { id: 3, name: "Cosmos", artist: "Nova Drift", cover: "🪐", color: "#FF6B6B" },
+  { id: 4, name: "Blossom", artist: "Petal Echo", cover: "🌸", color: "#FF8C42" },
+];
+
+const EQ_PRESETS = {
+  Flat:    [0, 0, 0, 0, 0],
+  Bass:    [6, 4, 0, -1, -2],
+  Treble:  [-2, -1, 0, 3, 5],
+  Vocal:   [-1, 0, 4, 3, 0],
+  Club:    [4, 2, 0, 2, 1],
+};
+
+const REVERB_PRESETS = ["None", "Concert Hall", "Cathedral", "Cave", "Studio", "Arena"];
+const SLEEP_OPTIONS = ["Off", "5 min", "15 min", "30 min", "60 min"];
+
+const LYRICS_MAP = {
+  1: "[0:12] Midnight glow across the skyline\n[0:24] I feel you breathing in the dark\n[0:36] Stars are painting neon outlines\n[0:48] Of every moment in my heart\n[1:02] We dance until the world dissolves\n[1:14] And only silence softly calls\n[1:28] This midnight glow around us both\n[1:40] Illuminates these golden halls",
+  2: "[0:08] Electric rain falls on the circuit\n[0:20] Cascading pulses through the night\n[0:32] Every drop a coded signal\n[0:44] Firing neurons into light\n[1:00] I am the storm and you're the thunder\n[1:12] Together tearing sky apart\n[1:24] Electric rain, electric wonder\n[1:36] Rewiring every broken heart",
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function parseDuration(str) {
+  const [m, s] = str.split(":").map(Number);
+  return m * 60 + s;
+}
+
+function formatTime(secs) {
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+const inputStyle = (T) => ({
+  background: T.surface2,
+  border: `1px solid ${T.border}`,
+  borderRadius: 8,
+  color: T.text,
+  padding: "10px 14px",
+  fontSize: 13,
+  width: "100%",
+  transition: "border-color 0.2s",
+});
+
+const iconBtnStyle = (T) => ({
+  background: "transparent",
+  border: "none",
+  color: T.text,
+  cursor: "pointer",
+  fontSize: 14,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 32,
+  height: 32,
+  borderRadius: "50%",
+  transition: "background 0.2s",
+});
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function VisualizerBars({ isPlaying, color = "#7C3AED" }) {
+  const bars = Array.from({ length: 20 });
+  return (
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 48 }}>
+      {bars.map((_, i) => (
+        <div
+          key={i}
+          style={{
+            width: 4,
+            borderRadius: 2,
+            background: color,
+            opacity: 0.8,
+            height: isPlaying ? undefined : 4,
+            animation: isPlaying ? `bar${(i % 5) + 1} ${0.6 + (i % 4) * 0.15}s ease-in-out infinite alternate` : "none",
+            minHeight: 4,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function Toast({ message }) {
+  if (!message) return null;
+  return (
+    <div style={{
+      position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)",
+      background: "rgba(124,58,237,0.95)", backdropFilter: "blur(12px)",
+      color: "#fff", padding: "10px 24px", borderRadius: 100,
+      fontSize: 13, fontWeight: 600, zIndex: 9999,
+      border: "1px solid rgba(255,255,255,0.15)",
+      boxShadow: "0 8px 32px rgba(124,58,237,0.4)",
+      animation: "fadeInUp 0.3s ease",
+    }}>
+      {message}
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export default function MusicVibe() {
+  // Routing
+  const [route, setRoute] = useState("auth");
+  const [routeHistory, setRouteHistory] = useState(["auth"]);
+  const [historyIdx, setHistoryIdx] = useState(0);
+  const [albumView, setAlbumView] = useState(null);
+  const [playlistView, setPlaylistView] = useState(null);
+
+  // User & Theme
+  const [user, setUser] = useState(null);
+  const [darkMode, setDarkMode] = useState(true);
+  const [profileOpen, setProfileOpen] = useState(false);
+
+  // Playback
+  const [currentSong, setCurrentSong] = useState(SONGS[0]);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [volume, setVolume] = useState(80);
+  const [isMuted, setIsMuted] = useState(false);
+  const [shuffle, setShuffle] = useState(false);
+  const [loop, setLoop] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+
+  // Audio Effects
+  const [eqValues, setEqValues] = useState([0, 0, 0, 0, 0]);
+  const [eqPreset, setEqPreset] = useState("Flat");
+  const [reverb, setReverb] = useState("None");
+  const [karaokeMode, setKaraokeMode] = useState(false);
+  const [sleepTimer, setSleepTimer] = useState("Off");
+  const [crossfade, setCrossfade] = useState(0);
+
+  // Library
+  const [liked, setLiked] = useState(new Set([1, 3]));
+  const [playlists, setPlaylists] = useState([
+    { id: 1, name: "Late Night Vibes", songs: [1, 4, 9] },
+    { id: 2, name: "Focus Mode", songs: [2, 7, 11] },
+  ]);
+  const [recentlyPlayed, setRecentlyPlayed] = useState([2, 5, 8, 1]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [newPlaylistName, setNewPlaylistName] = useState("");
+  const [songs, setSongs] = useState(SONGS);
+  const [albums, setAlbums] = useState(ALBUMS);
+
+  // Forms
+  const [authMode, setAuthMode] = useState("signin");
+  const [authForm, setAuthForm] = useState({ name: "", email: "", password: "" });
+  const [authError, setAuthError] = useState("");
+  const [adminTab, setAdminTab] = useState("createSong");
+  const [adminForm, setAdminForm] = useState({ title: "", artist: "", album: "", duration: "", cover: "🎵", albumName: "", albumArtist: "", albumCover: "🎵", albumColor: "#7C3AED" });
+  const [notification, setNotification] = useState("");
+
+  const timerRef = useRef(null);
+  const progressRef = useRef(null);
+
+  // ─── Notify ───────────────────────────────────────────────────────────────
+  const notify = useCallback((msg) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(""), 2500);
+  }, []);
+
+  // ─── Navigation ───────────────────────────────────────────────────────────
+  const navigate = useCallback((newRoute, params = {}) => {
+    if (params.album) setAlbumView(params.album);
+    if (params.playlist) setPlaylistView(params.playlist);
+    setRouteHistory(prev => {
+      const trimmed = prev.slice(0, historyIdx + 1);
+      return [...trimmed, newRoute];
+    });
+    setHistoryIdx(prev => prev + 1);
+    setRoute(newRoute);
+    setProfileOpen(false);
+  }, [historyIdx]);
+
+  const goBack = () => {
+    if (historyIdx > 0) {
+      setHistoryIdx(prev => prev - 1);
+      setRoute(routeHistory[historyIdx - 1]);
+    }
+  };
+
+  const goForward = () => {
+    if (historyIdx < routeHistory.length - 1) {
+      setHistoryIdx(prev => prev + 1);
+      setRoute(routeHistory[historyIdx + 1]);
+    }
+  };
+
+  // ─── Playback ─────────────────────────────────────────────────────────────
+  // Sleep Timer Handler
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (sleepTimer !== "Off" && isPlaying) {
+      const mins = parseInt(sleepTimer);
+      timerRef.current = setTimeout(() => {
+        setIsPlaying(false);
+        notify("Sleep timer finished, paused playback");
+        setSleepTimer("Off");
+      }, mins * 60 * 1000);
+    }
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [sleepTimer, isPlaying, notify]);
+
+  const playSong = useCallback((song) => {
+    setCurrentSong(song);
+    setIsPlaying(true);
+    setProgress(0);
+    setRecentlyPlayed(prev => {
+      const filtered = prev.filter(id => id !== song.id);
+      return [song.id, ...filtered].slice(0, 12);
+    });
+  }, []);
+
+  const skipNext = useCallback(() => {
+    const idx = songs.findIndex(s => s.id === currentSong.id);
+    let next;
+    if (shuffle) {
+      next = songs[Math.floor(Math.random() * songs.length)];
+    } else if (loop) {
+      next = currentSong;
+    } else {
+      next = songs[(idx + 1) % songs.length];
+    }
+    playSong(next);
+  }, [songs, currentSong, shuffle, loop, playSong]);
+
+  useEffect(() => {
+    if (isPlaying) {
+      progressRef.current = setInterval(() => {
+        setProgress(p => {
+          const dur = parseDuration(currentSong.duration);
+          if (p >= dur) {
+            skipNext();
+            return 0;
+          }
+          return p + 1;
+        });
+      }, 1000);
+    } else {
+      clearInterval(progressRef.current);
+    }
+    return () => clearInterval(progressRef.current);
+  }, [isPlaying, currentSong, skipNext]);
+
+  const skipPrev = () => {
+    if (progress > 3) { setProgress(0); return; }
+    const idx = songs.findIndex(s => s.id === currentSong.id);
+    const prev = songs[(idx - 1 + songs.length) % songs.length];
+    playSong(prev);
+  };
+
+  const toggleLike = (id) => {
+    setLiked(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) { next.delete(id); notify("Removed from liked songs"); }
+      else { next.add(id); notify("Added to liked songs ♥"); }
+      return next;
+    });
+  };
+
+  const addToPlaylist = (songId, playlistId) => {
+    setPlaylists(prev => prev.map(p =>
+      p.id === playlistId && !p.songs.includes(songId)
+        ? { ...p, songs: [...p.songs, songId] }
+        : p
+    ));
+    notify("Added to playlist");
+  };
+
+  const createPlaylist = () => {
+    if (!newPlaylistName.trim()) return;
+    setPlaylists(prev => [...prev, { id: Date.now(), name: newPlaylistName.trim(), songs: [] }]);
+    setNewPlaylistName("");
+    notify("Playlist created");
+  };
+
+  const deletePlaylist = (id) => {
+    setPlaylists(prev => prev.filter(p => p.id !== id));
+    notify("Playlist deleted");
+  };
+
+  // ─── Auth ─────────────────────────────────────────────────────────────────
+  const handleAuth = () => {
+    if (!authForm.email || !authForm.password) { setAuthError("Please fill all fields"); return; }
+    const normalizedEmail = authForm.email.trim().toLowerCase();
+    const isDemoAdmin = normalizedEmail === "demo.manager@musicvibe.local";
+    const u = { name: authForm.name || (isDemoAdmin ? "Admin User" : "Music Lover"), email: authForm.email, role: isDemoAdmin ? "admin" : "listener" };
+    setUser(u);
+    setAuthError("");
+    navigate(isDemoAdmin ? "admin" : "home");
+    notify(`Welcome back, ${u.name.split(" ")[0]}! 🎵`);
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setIsPlaying(false);
+    setProgress(0);
+    navigate("auth");
+  };
+
+  // ─── EQ ───────────────────────────────────────────────────────────────────
+  const applyEqPreset = (name) => {
+    setEqPreset(name);
+    setEqValues(EQ_PRESETS[name]);
+  };
+
+  // ─── Admin ────────────────────────────────────────────────────────────────
+  const handleCreateSong = () => {
+    if (!adminForm.title || !adminForm.artist) { notify("Fill required fields"); return; }
+    const album = albums.find(a => a.name === adminForm.album) || albums[0];
+    const newSong = {
+      id: Date.now(), title: adminForm.title, artist: adminForm.artist,
+      album: adminForm.album || "Unknown", duration: adminForm.duration || "3:00",
+      albumId: album?.id || 1, cover: adminForm.cover || "🎵",
+    };
+    setSongs(prev => [...prev, newSong]);
+    setAdminForm(f => ({ ...f, title: "", artist: "", album: "", duration: "", cover: "🎵" }));
+    notify("Song created!");
+  };
+
+  const handleCreateAlbum = () => {
+    if (!adminForm.albumName || !adminForm.albumArtist) { notify("Fill required fields"); return; }
+    const newAlbum = {
+      id: Date.now(), name: adminForm.albumName, artist: adminForm.albumArtist,
+      cover: adminForm.albumCover || "🎵", color: adminForm.albumColor || "#7C3AED",
+    };
+    setAlbums(prev => [...prev, newAlbum]);
+    setAdminForm(f => ({ ...f, albumName: "", albumArtist: "", albumCover: "🎵", albumColor: "#7C3AED" }));
+    notify("Album created!");
+  };
+
+  // ─── Derived ──────────────────────────────────────────────────────────────
+  const filteredSongs = songs.filter(s => {
+    const q = searchQuery.toLowerCase();
+    const titleMatch = s.title ? s.title.toLowerCase().includes(q) : false;
+    const artistMatch = s.artist ? s.artist.toLowerCase().includes(q) : false;
+    const albumMatch = s.album ? s.album.toLowerCase().includes(q) : false;
+    return titleMatch || artistMatch || albumMatch;
+  });
+
+  const currentAlbum = albums.find(a => a.id === currentSong?.albumId);
+  const accentColor = currentAlbum?.color || "#7C3AED";
+
+  // ─── Lyrics Parser ────────────────────────────────────────────────────────
+  const parsedLyrics = (() => {
+    const raw = LYRICS_MAP[currentSong?.id] || "";
+    return raw.split("\n").map(line => {
+      const match = line.match(/\[(\d+):(\d+)\] (.+)/);
+      if (!match) return null;
+      return { time: parseInt(match[1]) * 60 + parseInt(match[2]), text: match[3] };
+    }).filter(Boolean);
+  })();
+
+  const activeLyricIdx = parsedLyrics.reduce((acc, l, i) => l.time <= progress ? i : acc, -1);
+
+  // ─── Color helpers ────────────────────────────────────────────────────────
+  const T = {
+    bg: darkMode ? "#0A0A0F" : "#F0F0F8",
+    surface: darkMode ? "#12121A" : "#FFFFFF",
+    surface2: darkMode ? "#1A1A26" : "#F5F5FC",
+    border: darkMode ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.08)",
+    text: darkMode ? "#E8E8F0" : "#0A0A1A",
+    muted: darkMode ? "rgba(232,232,240,0.45)" : "rgba(10,10,26,0.45)",
+    accent: accentColor,
+    violet: "#7C3AED",
+  };
+
+  const css = `
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.3); border-radius: 2px; }
+    input, select { outline: none; font-family: inherit; }
+    button { cursor: pointer; font-family: inherit; border: none; }
+
+    @keyframes bar1 { to { height: 40px; } }
+    @keyframes bar2 { to { height: 28px; } }
+    @keyframes bar3 { to { height: 44px; } }
+    @keyframes bar4 { to { height: 20px; } }
+    @keyframes bar5 { to { height: 36px; } }
+    @keyframes fadeInUp { from { opacity:0; transform: translateX(-50%) translateY(10px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+    @keyframes pulse { 0%,100% { opacity: 0.6; transform: scale(1); } 50% { opacity: 1; transform: scale(1.05); } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes slideIn { from { opacity:0; transform: translateY(-8px); } to { opacity:1; transform: translateY(0); } }
+    @keyframes glow { 0%,100% { box-shadow: 0 0 20px ${accentColor}44; } 50% { box-shadow: 0 0 40px ${accentColor}88; } }
+    @keyframes float { 0%,100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
+    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+
+    .song-row:hover { background: ${T.surface2} !important; }
+    .song-row:hover .hover-actions { opacity: 1 !important; }
+    .nav-item:hover { background: ${T.surface2} !important; color: ${T.text} !important; }
+    .nav-item.active { background: ${accentColor}22 !important; color: ${accentColor} !important; }
+    .btn-primary { background: ${accentColor}; color: #fff; transition: all 0.2s; }
+    .btn-primary:hover { filter: brightness(1.15); transform: scale(1.02); }
+    .album-card:hover { transform: translateY(-4px) !important; box-shadow: 0 20px 60px ${accentColor}33 !important; }
+    .playlist-card:hover { background: ${T.surface2} !important; }
+    .range-styled { -webkit-appearance: none; appearance: none; background: transparent; }
+    .range-styled::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: ${accentColor}; cursor: pointer; margin-top: -5px; }
+    .range-styled::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: ${darkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"}; }
+    .eq-range::-webkit-slider-runnable-track { background: ${darkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}; }
+    .eq-range::-webkit-slider-thumb { background: ${accentColor}; }
+  `;
+
+  // ─── Screens ──────────────────────────────────────────────────────────────
+
+  // AUTH ─────────────────────────────────────────────────────────────────────
+  const AuthScreen = () => (
+    <div style={{ display: "flex", height: "100vh", background: T.bg, animation: "fadeIn 0.4s ease" }}>
+      {/* Left decorative panel */}
+      <div style={{
+        flex: 1, flexDirection: "column", alignItems: "center", justifyContent: "center",
+        background: `linear-gradient(135deg, ${T.surface} 0%, ${T.bg} 100%)`,
+        borderRight: `1px solid ${T.border}`, position: "relative", overflow: "hidden",
+        display: window.innerWidth < 768 ? "none" : "flex",
+      }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: `radial-gradient(ellipse at 30% 50%, ${accentColor}18 0%, transparent 70%)` }} />
+        <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", gap: 16, alignItems: "center" }}>
+          <div style={{ fontSize: 64, marginBottom: 16, animation: "float 3s ease-in-out infinite" }}>🎵</div>
+          <h1 style={{ color: T.text, fontSize: 36, fontWeight: 900, letterSpacing: -1.5 }}>MusicVibe</h1>
+          <p style={{ color: T.muted, fontSize: 15, textAlign: "center", maxWidth: 260, lineHeight: 1.6 }}>
+            Your premium music experience, refined and personal.
+          </p>
+          {/* Floating song cards */}
+          <div style={{ marginTop: 32, display: "flex", flexDirection: "column", gap: 10 }}>
+            {[
+              { title: "Midnight Glow", artist: "Luna Echo", cover: "🌙", playing: true },
+              { title: "Electric Rain", artist: "Synth Pulse", cover: "⚡", playing: false },
+              { title: "Orbit", artist: "Nova Drift", cover: "🪐", playing: false },
+            ].map((s, i) => (
+              <div key={i} style={{
+                display: "flex", alignItems: "center", gap: 12,
+                background: T.surface2, border: `1px solid ${T.border}`,
+                borderRadius: 12, padding: "10px 16px",
+                animation: `float ${2.5 + i * 0.4}s ease-in-out infinite`,
+                animationDelay: `${i * 0.3}s`,
+                transform: `translateX(${i % 2 === 0 ? 0 : 20}px)`,
+              }}>
+                <span style={{ fontSize: 28 }}>{s.cover}</span>
+                <div>
+                  <div style={{ color: T.text, fontSize: 13, fontWeight: 600 }}>{s.title}</div>
+                  <div style={{ color: T.muted, fontSize: 11 }}>{s.artist}</div>
+                </div>
+                {s.playing && (
+                  <div style={{ marginLeft: 8 }}>
+                    <VisualizerBars isPlaying={true} color={accentColor} />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Right form panel */}
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 32 }}>
+        <div style={{ width: "100%", maxWidth: 380 }}>
+          <div style={{ marginBottom: 32 }}>
+            <h2 style={{ color: T.text, fontSize: 28, fontWeight: 800, marginBottom: 6 }}>
+              {authMode === "signin" ? "Welcome back" : "Create account"}
+            </h2>
+            <p style={{ color: T.muted, fontSize: 14 }}>
+              {authMode === "signin" ? "Sign in to continue your journey" : "Start your music journey today"}
+            </p>
+          </div>
+
+          {/* Tabs */}
+          <div style={{ display: "flex", background: T.surface2, borderRadius: 10, padding: 4, marginBottom: 24, border: `1px solid ${T.border}` }}>
+            {["signin", "signup"].map(m => (
+              <button key={m} onClick={() => { setAuthMode(m); setAuthError(""); }}
+                style={{
+                  flex: 1, padding: "8px 0", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                  background: authMode === m ? accentColor : "transparent",
+                  color: authMode === m ? "#fff" : T.muted, transition: "all 0.2s",
+                }}>
+                {m === "signin" ? "Sign In" : "Sign Up"}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {authMode === "signup" && (
+              <input value={authForm.name} onChange={e => setAuthForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="Full name"
+                style={{ ...inputStyle(T), }}
+              />
+            )}
+            <input value={authForm.email} onChange={e => setAuthForm(f => ({ ...f, email: e.target.value }))}
+              placeholder="Email address" type="email"
+              style={inputStyle(T)}
+            />
+            <input value={authForm.password} onChange={e => setAuthForm(f => ({ ...f, password: e.target.value }))}
+              placeholder="Password" type="password"
+              onKeyDown={e => e.key === "Enter" && handleAuth()}
+              style={inputStyle(T)}
+            />
+          </div>
+
+          {authError && <p style={{ color: "#FF6B6B", fontSize: 12, marginTop: 8 }}>{authError}</p>}
+
+          <button onClick={handleAuth} className="btn-primary"
+            style={{ width: "100%", padding: "13px 0", borderRadius: 10, fontSize: 14, fontWeight: 700, marginTop: 16 }}>
+            {authMode === "signin" ? "Sign In" : "Create Account"}
+          </button>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "16px 0" }}>
+            <div style={{ flex: 1, height: 1, background: T.border }} />
+            <span style={{ color: T.muted, fontSize: 12 }}>or</span>
+            <div style={{ flex: 1, height: 1, background: T.border }} />
+          </div>
+
+          <button onClick={() => { setAuthForm(f => ({ ...f, email: "user@gmail.com", password: "pass" })); setTimeout(handleAuth, 100); }}
+            style={{
+              width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 14, fontWeight: 600,
+              background: T.surface2, color: T.text, border: `1px solid ${T.border}`, transition: "all 0.2s",
+            }}>
+            🔵 Continue with Google
+          </button>
+
+          <p style={{ color: T.muted, fontSize: 11, textAlign: "center", marginTop: 20, lineHeight: 1.5 }}>
+            Demo admin access uses a dedicated local demo account.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+
+  // SHELL ────────────────────────────────────────────────────────────────────
+  const Shell = ({ children }) => (
+    <div style={{ display: "flex", height: "100vh", background: T.bg, color: T.text, fontFamily: "'Inter', system-ui, sans-serif" }}>
+      {/* Sidebar */}
+      <div style={{
+        width: 220, flexShrink: 0, background: T.surface, borderRight: `1px solid ${T.border}`,
+        display: "flex", flexDirection: "column", padding: "20px 12px",
+      }}>
+        {/* Logo */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, paddingLeft: 8, marginBottom: 28 }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: 8,
+            background: `linear-gradient(135deg, ${accentColor}, ${accentColor}99)`,
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16,
+          }}>🎵</div>
+          <span style={{ fontWeight: 900, fontSize: 17, letterSpacing: -0.5, color: T.text }}>MusicVibe</span>
+        </div>
+
+        {/* Nav */}
+        {[
+          { label: "Home", icon: "🏠", r: "home" },
+          { label: "Profile", icon: "👤", r: "profile" },
+          ...(user?.role === "admin" ? [{ label: "Admin", icon: "⚙️", r: "admin" }] : []),
+        ].map(({ label, icon, r }) => (
+          <button key={r} onClick={() => navigate(r)} className={`nav-item ${route === r ? "active" : ""}`}
+            style={{
+              display: "flex", alignItems: "center", gap: 10, padding: "9px 10px",
+              borderRadius: 8, border: "none", background: "transparent",
+              color: route === r ? accentColor : T.muted,
+              fontSize: 13, fontWeight: 600, cursor: "pointer", width: "100%", textAlign: "left",
+              transition: "all 0.15s", marginBottom: 2,
+            }}>
+            <span>{icon}</span>{label}
+          </button>
+        ))}
+
+        <div style={{ height: 1, background: T.border, margin: "16px 0" }} />
+        <p style={{ color: T.muted, fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", paddingLeft: 10, marginBottom: 10 }}>Your Playlists</p>
+
+        <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 2 }}>
+          {playlists.map(pl => (
+            <button key={pl.id} onClick={() => navigate("playlist", { playlist: pl })}
+              className="nav-item"
+              style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "7px 10px",
+                borderRadius: 8, border: "none", background: "transparent",
+                color: T.muted, fontSize: 12, fontWeight: 500, cursor: "pointer", width: "100%", textAlign: "left",
+              }}>
+              <span style={{ fontSize: 10 }}>♪</span>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pl.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Main Area */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        {/* Top Bar */}
+        <div style={{
+          height: 60, background: T.surface, borderBottom: `1px solid ${T.border}`,
+          display: "flex", alignItems: "center", gap: 12, padding: "0 20px", flexShrink: 0,
+        }}>
+          <button onClick={goBack} disabled={historyIdx === 0}
+            style={{ ...iconBtnStyle(T), opacity: historyIdx === 0 ? 0.3 : 1 }}>◀</button>
+          <button onClick={goForward} disabled={historyIdx >= routeHistory.length - 1}
+            style={{ ...iconBtnStyle(T), opacity: historyIdx >= routeHistory.length - 1 ? 0.3 : 1 }}>▶</button>
+
+          <div style={{ flex: 1, maxWidth: 320 }}>
+            <input
+              value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search songs, artists…"
+              style={{ ...inputStyle(T), padding: "8px 14px", fontSize: 13, width: "100%" }}
+            />
+          </div>
+
+          <div style={{ flex: 1 }} />
+
+          <button onClick={() => setDarkMode(d => !d)} style={iconBtnStyle(T)}>
+            {darkMode ? "☀️" : "🌙"}
+          </button>
+
+          {/* Profile */}
+          <div style={{ position: "relative" }}>
+            <button onClick={() => setProfileOpen(o => !o)}
+              style={{
+                width: 36, height: 36, borderRadius: "50%",
+                background: `linear-gradient(135deg, ${accentColor}, ${accentColor}99)`,
+                border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", color: "#fff",
+                fontWeight: 700, fontSize: 14,
+              }}>
+              {user?.name?.[0]?.toUpperCase() || "U"}
+            </button>
+
+            {profileOpen && (
+              <div style={{
+                position: "absolute", top: "calc(100% + 8px)", right: 0, width: 220,
+                background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12,
+                boxShadow: `0 16px 48px ${darkMode ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.15)"}`,
+                zIndex: 100, overflow: "hidden", animation: "slideIn 0.2s ease",
+              }}>
+                <div style={{ padding: "14px 16px", borderBottom: `1px solid ${T.border}` }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: T.text }}>{user?.name}</div>
+                  <div style={{ color: T.muted, fontSize: 12, marginTop: 2 }}>{user?.email}</div>
+                  <div style={{
+                    display: "inline-block", marginTop: 6, padding: "2px 8px", borderRadius: 100,
+                    background: `${accentColor}22`, color: accentColor, fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+                  }}>{user?.role}</div>
+                </div>
+                {[
+                  { label: "My Dashboard", icon: "👤", action: () => navigate("profile") },
+                  ...(user?.role === "admin" ? [{ label: "Admin Panel", icon: "⚙️", action: () => navigate("admin") }] : []),
+                  { label: "Sign Out", icon: "🚪", action: handleLogout, danger: true },
+                ].map(({ label, icon, action, danger }) => (
+                  <button key={label} onClick={action}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "11px 16px",
+                      background: "transparent", border: "none", cursor: "pointer",
+                      color: danger ? "#FF6B6B" : T.text, fontSize: 13, fontWeight: 500, textAlign: "left",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = T.surface2}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  >
+                    <span>{icon}</span>{label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Content */}
+        <div style={{ flex: 1, overflowY: "auto", background: T.bg }}>
+          {children}
+        </div>
+
+        {/* Mini Player */}
+        <div style={{
+          height: 72, background: T.surface, borderTop: `1px solid ${T.border}`,
+          display: "flex", alignItems: "center", padding: "0 20px", gap: 16, flexShrink: 0,
+          boxShadow: `0 -8px 32px ${darkMode ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.05)"}`,
+        }}>
+          {/* Song info */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flex: "0 0 240px" }}>
+            <div onClick={() => setFullscreen(true)} style={{
+              width: 48, height: 48, borderRadius: 10, background: `linear-gradient(135deg, ${accentColor}44, ${accentColor}22)`,
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, cursor: "pointer",
+              border: `1px solid ${accentColor}33`, flexShrink: 0,
+              animation: isPlaying ? "pulse 2s ease-in-out infinite" : "none",
+            }}>{currentSong?.cover}</div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, color: T.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{currentSong?.title}</div>
+              <div style={{ color: T.muted, fontSize: 11 }}>{currentSong?.artist}</div>
+            </div>
+            <button onClick={() => toggleLike(currentSong?.id)}
+              style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: liked.has(currentSong?.id) ? "#FF6B6B" : T.muted, flexShrink: 0 }}>
+              {liked.has(currentSong?.id) ? "♥" : "♡"}
+            </button>
+          </div>
+
+          {/* Controls */}
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, maxWidth: 500 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+              <button onClick={() => setShuffle(s => !s)} style={{ ...iconBtnStyle(T), color: shuffle ? accentColor : T.muted, fontSize: 14 }}>⇄</button>
+              <button onClick={skipPrev} style={{ ...iconBtnStyle(T), fontSize: 16 }}>⏮</button>
+              <button onClick={() => setIsPlaying(p => !p)}
+                style={{
+                  width: 40, height: 40, borderRadius: "50%", border: "none", cursor: "pointer",
+                  background: accentColor, color: "#fff", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: `0 4px 16px ${accentColor}44`,
+                }}>
+                {isPlaying ? "⏸" : "▶"}
+              </button>
+              <button onClick={skipNext} style={{ ...iconBtnStyle(T), fontSize: 16 }}>⏭</button>
+              <button onClick={() => setLoop(l => !l)} style={{ ...iconBtnStyle(T), color: loop ? accentColor : T.muted, fontSize: 14 }}>↻</button>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
+              <span style={{ color: T.muted, fontSize: 11, fontVariantNumeric: "tabular-nums", width: 32, textAlign: "right" }}>{formatTime(progress)}</span>
+              <input type="range" min={0} max={parseDuration(currentSong?.duration || "0:00")} value={progress}
+                onChange={e => setProgress(Number(e.target.value))} className="range-styled"
+                style={{ flex: 1, height: 4, accentColor, cursor: "pointer" }}
+              />
+              <span style={{ color: T.muted, fontSize: 11, fontVariantNumeric: "tabular-nums", width: 32 }}>{currentSong?.duration}</span>
+            </div>
+          </div>
+
+          {/* Volume + Fullscreen */}
+          <div style={{ flex: "0 0 200px", display: "flex", alignItems: "center", gap: 10, justifyContent: "flex-end" }}>
+            <button onClick={() => setIsMuted(m => !m)} style={{ ...iconBtnStyle(T), fontSize: 14 }}>
+              {isMuted || volume === 0 ? "🔇" : volume < 50 ? "🔉" : "🔊"}
+            </button>
+            <input type="range" min={0} max={100} value={isMuted ? 0 : volume}
+              onChange={e => { setVolume(Number(e.target.value)); setIsMuted(false); }} className="range-styled"
+              style={{ width: 80, accentColor }}
+            />
+            <button onClick={() => setFullscreen(true)} style={{ ...iconBtnStyle(T), fontSize: 14 }}>⤢</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Fullscreen Player Overlay */}
+      {fullscreen && <FullscreenPlayer />}
+    </div>
+  );
+
+  // HOME ─────────────────────────────────────────────────────────────────────
+  const HomeView = () => {
+    const featuredSong = filteredSongs[0] || songs[0];
+    const featuredAlbum = albums.find(a => a.id === featuredSong?.albumId);
+    const recentSongs = recentlyPlayed.map(id => songs.find(s => s.id === id)).filter(Boolean);
+
+    return (
+      <div style={{ padding: "0 0 40px 0" }}>
+        {/* Featured Banner */}
+        {featuredSong && (
+          <div style={{
+            margin: 20, borderRadius: 20, padding: "40px 36px",
+            background: `linear-gradient(135deg, ${featuredAlbum?.color || accentColor}33 0%, ${T.surface} 100%)`,
+            border: `1px solid ${featuredAlbum?.color || accentColor}22`,
+            position: "relative", overflow: "hidden",
+          }}>
+            <div style={{ position: "absolute", top: -40, right: -40, width: 200, height: 200, borderRadius: "50%", background: `${featuredAlbum?.color || accentColor}15` }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 28, position: "relative", zIndex: 1 }}>
+              <div style={{
+                width: 96, height: 96, borderRadius: 16, fontSize: 48,
+                background: `${featuredAlbum?.color || accentColor}22`, display: "flex", alignItems: "center", justifyContent: "center",
+                border: `2px solid ${featuredAlbum?.color || accentColor}44`, flexShrink: 0,
+              }}>{featuredSong?.cover}</div>
+              <div>
+                <div style={{ color: featuredAlbum?.color || accentColor, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6 }}>Featured Track</div>
+                <h2 style={{ color: T.text, fontSize: 30, fontWeight: 900, letterSpacing: -1, marginBottom: 4 }}>{featuredSong?.title}</h2>
+                <p style={{ color: T.muted, fontSize: 14, marginBottom: 20 }}>{featuredSong?.artist} · {featuredSong?.album}</p>
+                <button onClick={() => playSong(featuredSong)} className="btn-primary"
+                  style={{ padding: "10px 24px", borderRadius: 100, fontSize: 13, fontWeight: 700 }}>
+                  ▶ Play Now
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Albums Row */}
+        <div style={{ padding: "0 20px" }}>
+          <h3 style={{ color: T.text, fontSize: 17, fontWeight: 800, marginBottom: 14 }}>Albums</h3>
+          <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 4 }}>
+            {albums.map(album => (
+              <div key={album.id} onClick={() => navigate("album", { album })}
+                className="album-card"
+                style={{
+                  flexShrink: 0, width: 140, background: T.surface, border: `1px solid ${T.border}`,
+                  borderRadius: 14, padding: 14, cursor: "pointer", transition: "all 0.25s",
+                }}>
+                <div style={{
+                  width: 112, height: 112, borderRadius: 10, fontSize: 48,
+                  background: `${album.color}22`, display: "flex", alignItems: "center", justifyContent: "center",
+                  marginBottom: 10, border: `1px solid ${album.color}33`,
+                }}>{album.cover}</div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: T.text, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{album.name}</div>
+                <div style={{ color: T.muted, fontSize: 11 }}>{album.artist}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Recently Played */}
+        {recentSongs.length > 0 && (
+          <div style={{ padding: "24px 20px 0" }}>
+            <h3 style={{ color: T.text, fontSize: 17, fontWeight: 800, marginBottom: 14 }}>Recently Played</h3>
+            <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 4 }}>
+              {recentSongs.map(s => (
+                <div key={s.id} onClick={() => playSong(s)}
+                  style={{
+                    flexShrink: 0, width: 120, background: T.surface, border: `1px solid ${T.border}`,
+                    borderRadius: 12, padding: 12, cursor: "pointer", transition: "all 0.2s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                  onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+                >
+                  <div style={{ fontSize: 36, marginBottom: 8, textAlign: "center" }}>{s.cover}</div>
+                  <div style={{ fontWeight: 600, fontSize: 12, color: T.text, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
+                  <div style={{ color: T.muted, fontSize: 10, textAlign: "center" }}>{s.artist}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tracks Table */}
+        <div style={{ padding: "24px 20px 0" }}>
+          <h3 style={{ color: T.text, fontSize: 17, fontWeight: 800, marginBottom: 14 }}>
+            {searchQuery ? `Results for "${searchQuery}"` : "All Tracks"}
+          </h3>
+          <SongTable songs={filteredSongs} showIndex />
+        </div>
+      </div>
+    );
+  };
+
+  // SONG TABLE ───────────────────────────────────────────────────────────────
+  const SongTable = ({ songs: songList, showIndex }) => (
+    <div style={{ background: T.surface, borderRadius: 14, border: `1px solid ${T.border}`, overflow: "hidden" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr 120px 80px 80px", padding: "10px 16px", borderBottom: `1px solid ${T.border}` }}>
+        {["#", "Title", "Artist", "Album", "Duration", ""].map((h, i) => (
+          <span key={i} style={{ color: T.muted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.8 }}>{h}</span>
+        ))}
+      </div>
+      {songList.map((s, idx) => (
+        <div key={s.id} className="song-row"
+          style={{
+            display: "grid", gridTemplateColumns: "40px 1fr 1fr 120px 80px 80px",
+            padding: "10px 16px", alignItems: "center",
+            borderBottom: `1px solid ${T.border}`,
+            background: currentSong?.id === s.id ? `${accentColor}0A` : "transparent",
+            cursor: "pointer", transition: "background 0.15s",
+          }}
+          onClick={() => playSong(s)}
+        >
+          <span style={{ color: currentSong?.id === s.id ? accentColor : T.muted, fontSize: 12, fontWeight: 600 }}>
+            {currentSong?.id === s.id && isPlaying ? "▶" : (showIndex ? idx + 1 : s.cover)}
+          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+            <span style={{ fontSize: 22, flexShrink: 0 }}>{s.cover}</span>
+            <span style={{ fontWeight: 600, fontSize: 13, color: currentSong?.id === s.id ? accentColor : T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.title}</span>
+          </div>
+          <span style={{ color: T.muted, fontSize: 13 }}>{s.artist}</span>
+          <span style={{ color: T.muted, fontSize: 12 }}>{s.album}</span>
+          <span style={{ color: T.muted, fontSize: 12, fontVariantNumeric: "tabular-nums" }}>{s.duration}</span>
+          <div className="hover-actions" style={{ display: "flex", gap: 6, opacity: 0, transition: "opacity 0.2s" }}
+            onClick={e => e.stopPropagation()}>
+            <button onClick={() => toggleLike(s.id)}
+              style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: liked.has(s.id) ? "#FF6B6B" : T.muted }}>
+              {liked.has(s.id) ? "♥" : "♡"}
+            </button>
+            <select onChange={e => { if (e.target.value) addToPlaylist(s.id, Number(e.target.value)); e.target.value = ""; }}
+              style={{ background: T.surface2, border: `1px solid ${T.border}`, borderRadius: 6, color: T.muted, fontSize: 11, padding: "2px 4px", cursor: "pointer" }}>
+              <option value="">+</option>
+              {playlists.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+        </div>
+      ))}
+      {songList.length === 0 && (
+        <div style={{ padding: "40px 20px", textAlign: "center", color: T.muted }}>No tracks found</div>
+      )}
+    </div>
+  );
+
+  // PROFILE ──────────────────────────────────────────────────────────────────
+  const ProfileView = () => (
+    <div style={{ padding: 20 }}>
+      {/* Banner */}
+      <div style={{
+        borderRadius: 16, padding: "32px 28px", marginBottom: 20,
+        background: `linear-gradient(135deg, ${accentColor}22, ${T.surface})`,
+        border: `1px solid ${T.border}`,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+          <div style={{
+            width: 72, height: 72, borderRadius: "50%", background: `linear-gradient(135deg, ${accentColor}, ${accentColor}88)`,
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 900, color: "#fff",
+          }}>{user?.name?.[0]?.toUpperCase()}</div>
+          <div>
+            <h2 style={{ color: T.text, fontSize: 24, fontWeight: 900, marginBottom: 4 }}>{user?.name}</h2>
+            <p style={{ color: T.muted, fontSize: 14 }}>{user?.email}</p>
+            <div style={{
+              display: "inline-block", marginTop: 8, padding: "3px 10px", borderRadius: 100,
+              background: `${accentColor}22`, color: accentColor, fontSize: 11, fontWeight: 700, textTransform: "uppercase",
+            }}>{user?.role}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Liked Songs", value: liked.size, icon: "♥", color: "#FF6B6B" },
+          { label: "Playlists", value: playlists.length, icon: "♪", color: accentColor },
+          { label: "Recently Played", value: recentlyPlayed.length, icon: "⏱", color: "#FFB800" },
+        ].map(({ label, value, icon, color }) => (
+          <div key={label} style={{ background: T.surface, borderRadius: 14, padding: 20, border: `1px solid ${T.border}`, textAlign: "center" }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>{icon}</div>
+            <div style={{ color, fontSize: 28, fontWeight: 900, marginBottom: 4 }}>{value}</div>
+            <div style={{ color: T.muted, fontSize: 12, fontWeight: 500 }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Playlists Manager */}
+      <div style={{ background: T.surface, borderRadius: 16, padding: 20, border: `1px solid ${T.border}` }}>
+        <h3 style={{ color: T.text, fontSize: 16, fontWeight: 800, marginBottom: 16 }}>Your Playlists</h3>
+        <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+          <input value={newPlaylistName} onChange={e => setNewPlaylistName(e.target.value)}
+            placeholder="New playlist name…" onKeyDown={e => e.key === "Enter" && createPlaylist()}
+            style={{ ...inputStyle(T), flex: 1, padding: "9px 14px", fontSize: 13 }}
+          />
+          <button onClick={createPlaylist} className="btn-primary"
+            style={{ padding: "9px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700 }}>
+            Create
+          </button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {playlists.map(pl => (
+            <div key={pl.id} className="playlist-card"
+              style={{ display: "flex", alignItems: "center", padding: "12px 14px", borderRadius: 10, border: `1px solid ${T.border}`, transition: "background 0.15s" }}>
+              <div style={{ width: 36, height: 36, borderRadius: 8, background: `${accentColor}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0, marginRight: 12 }}>♪</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: T.text }}>{pl.name}</div>
+                <div style={{ color: T.muted, fontSize: 11 }}>{pl.songs.length} tracks</div>
+              </div>
+              <button onClick={() => deletePlaylist(pl.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#FF6B6B", fontSize: 14 }}>
+                🗑️
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  // ALBUM VIEW ───────────────────────────────────────────────────────────────
+  const AlbumView = () => {
+    if (!albumView) return null;
+    const albumSongs = songs.filter(s => s.albumId === albumView.id);
+    return (
+      <div style={{ padding: 20 }}>
+        {/* Album Header */}
+        <div style={{ display: "flex", gap: 24, marginBottom: 24, alignItems: "flex-end" }}>
+          <div style={{
+            width: 120, height: 120, borderRadius: 16, fontSize: 56,
+            background: `${albumView.color}22`, display: "flex", alignItems: "center", justifyContent: "center",
+            border: `2px solid ${albumView.color}44`, flexShrink: 0
+          }}>{albumView.cover}</div>
+          <div>
+            <div style={{ color: albumView.color, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>Album</div>
+            <h2 style={{ color: T.text, fontSize: 28, fontWeight: 900, marginBottom: 4 }}>{albumView.name}</h2>
+            <p style={{ color: T.muted, fontSize: 13 }}>By {albumView.artist} · {albumSongs.length} songs</p>
+          </div>
+        </div>
+        <SongTable songs={albumSongs} showIndex />
+      </div>
+    );
+  };
+
+  // PLAYLIST VIEW ────────────────────────────────────────────────────────────
+  const PlaylistView = () => {
+    if (!playlistView) return null;
+    const playlistSongs = songs.filter(s => playlistView.songs.includes(s.id));
+    return (
+      <div style={{ padding: 20 }}>
+        {/* Playlist Header */}
+        <div style={{ display: "flex", gap: 24, marginBottom: 24, alignItems: "flex-end" }}>
+          <div style={{
+            width: 120, height: 120, borderRadius: 16, fontSize: 56,
+            background: `${accentColor}22`, display: "flex", alignItems: "center", justifyContent: "center",
+            border: `2px solid ${accentColor}44`, flexShrink: 0
+          }}>♪</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: accentColor, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>Playlist</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+              <h2 style={{ color: T.text, fontSize: 28, fontWeight: 900 }}>{playlistView.name}</h2>
+              <button onClick={() => { deletePlaylist(playlistView.id); navigate("home"); }}
+                style={{ color: "#FF6B6B", background: "none", border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                Delete Playlist
+              </button>
+            </div>
+            <p style={{ color: T.muted, fontSize: 13, marginTop: 4 }}>{playlistSongs.length} songs</p>
+          </div>
+        </div>
+        <SongTable songs={playlistSongs} showIndex />
+      </div>
+    );
+  };
+
+  // ADMIN VIEW ───────────────────────────────────────────────────────────────
+  const AdminView = () => {
+    if (user?.role !== "admin") return <div style={{ padding: 20, color: T.text }}>Access Denied. Admin privileges required.</div>;
+    return (
+      <div style={{ padding: 20 }}>
+        <h2 style={{ color: T.text, fontSize: 24, fontWeight: 800, marginBottom: 20 }}>Admin Panel</h2>
+        {/* Admin Tabs */}
+        <div style={{ display: "flex", gap: 10, marginBottom: 20, borderBottom: `1px solid ${T.border}`, paddingBottom: 10 }}>
+          {["createSong", "createAlbum"].map(tab => (
+            <button key={tab} onClick={() => setAdminTab(tab)}
+              style={{
+                padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                background: adminTab === tab ? accentColor : "transparent",
+                color: adminTab === tab ? "#fff" : T.muted, transition: "all 0.2s"
+              }}>
+              {tab === "createSong" ? "Add Song" : "Create Album"}
+            </button>
+          ))}
+        </div>
+        {adminTab === "createSong" ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 400 }}>
+            <input value={adminForm.title} onChange={e => setAdminForm(f => ({ ...f, title: e.target.value }))} placeholder="Song Title" style={inputStyle(T)} />
+            <input value={adminForm.artist} onChange={e => setAdminForm(f => ({ ...f, artist: e.target.value }))} placeholder="Artist Name" style={inputStyle(T)} />
+            <select value={adminForm.album} onChange={e => setAdminForm(f => ({ ...f, album: e.target.value }))} style={inputStyle(T)}>
+              <option value="">Select Album</option>
+              {albums.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
+            </select>
+            <input value={adminForm.duration} onChange={e => setAdminForm(f => ({ ...f, duration: e.target.value }))} placeholder="Duration (e.g. 3:45)" style={inputStyle(T)} />
+            <input value={adminForm.cover} onChange={e => setAdminForm(f => ({ ...f, cover: e.target.value }))} placeholder="Cover Emoji" style={inputStyle(T)} />
+            <button onClick={handleCreateSong} className="btn-primary" style={{ padding: "12px", borderRadius: 8, fontWeight: 700 }}>Add Song</button>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 400 }}>
+            <input value={adminForm.albumName} onChange={e => setAdminForm(f => ({ ...f, albumName: e.target.value }))} placeholder="Album Name" style={inputStyle(T)} />
+            <input value={adminForm.albumArtist} onChange={e => setAdminForm(f => ({ ...f, albumArtist: e.target.value }))} placeholder="Album Artist" style={inputStyle(T)} />
+            <input value={adminForm.albumCover} onChange={e => setAdminForm(f => ({ ...f, albumCover: e.target.value }))} placeholder="Album Cover Emoji" style={inputStyle(T)} />
+            <input value={adminForm.albumColor} onChange={e => setAdminForm(f => ({ ...f, albumColor: e.target.value }))} placeholder="Album Theme Color (Hex)" style={inputStyle(T)} />
+            <button onClick={handleCreateAlbum} className="btn-primary" style={{ padding: "12px", borderRadius: 8, fontWeight: 700 }}>Create Album</button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // FULLSCREEN PLAYER ────────────────────────────────────────────────────────
+  const FullscreenPlayer = () => {
+    return (
+      <div style={{
+        position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+        background: `linear-gradient(185deg, ${accentColor}dd 0%, ${T.bg} 100%)`,
+        backdropFilter: "blur(24px)", zIndex: 1000, display: "flex", flexDirection: "column",
+        padding: "30px 24px", animation: "fadeIn 0.3s ease", color: "#fff"
+      }}>
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <button onClick={() => setFullscreen(false)} style={{ background: "none", border: "none", color: "#fff", fontSize: 24, cursor: "pointer" }}>▼</button>
+          <span style={{ fontWeight: 800, fontSize: 13, letterSpacing: 1 }}>NOW PLAYING</span>
+          <div style={{ width: 24 }} />
+        </div>
+
+        {/* Core Layout */}
+        <div style={{ flex: 1, display: "flex", gap: 40, alignItems: "center", justifyContent: "center", padding: "20px 0", flexWrap: "wrap", overflowY: "auto" }}>
+          {/* Cover Art and Visualizer */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 24 }}>
+            <div style={{
+              width: 260, height: 260, borderRadius: 24, fontSize: 100,
+              background: `rgba(255,255,255,0.08)`, display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: "0 20px 50px rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.15)",
+              animation: isPlaying ? "float 3s ease-in-out infinite" : "none"
+            }}>{currentSong?.cover}</div>
+            <VisualizerBars isPlaying={isPlaying} color="#fff" />
+          </div>
+
+          {/* Lyrics and Effects */}
+          <div style={{ flex: 1, minWidth: 280, maxWidth: 450, height: 360, display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Lyrics View */}
+            <div style={{
+              flex: 1, background: "rgba(0,0,0,0.25)", borderRadius: 16, padding: 20,
+              overflowY: "auto", display: "flex", flexDirection: "column", gap: 14, border: "1px solid rgba(255,255,255,0.06)"
+            }}>
+              {parsedLyrics.length > 0 ? (
+                parsedLyrics.map((l, i) => (
+                  <div key={i} style={{
+                    color: i === activeLyricIdx ? "#fff" : "rgba(255,255,255,0.35)",
+                    fontSize: i === activeLyricIdx ? 16 : 14,
+                    fontWeight: i === activeLyricIdx ? 700 : 500,
+                    transition: "all 0.3s", transform: i === activeLyricIdx ? "scale(1.02)" : "scale(1)"
+                  }}>{l.text}</div>
+                ))
+              ) : (
+                <div style={{ color: "rgba(255,255,255,0.3)", textAlign: "center", padding: 40, fontSize: 13 }}>No lyrics available</div>
+              )}
+            </div>
+
+            {/* Audio Effects Controllers */}
+            <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 16, padding: 16, display: "flex", flexDirection: "column", gap: 12, border: "1px solid rgba(255,255,255,0.05)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+                <div>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.6)", textTransform: "uppercase" }}>EQ Preset</span>
+                  <select value={eqPreset} onChange={e => applyEqPreset(e.target.value)}
+                    style={{ display: "block", width: "100%", background: "rgba(0,0,0,0.3)", border: "none", color: "#fff", padding: "6px 10px", borderRadius: 8, fontSize: 12, marginTop: 4 }}>
+                    {Object.keys(EQ_PRESETS).map(name => <option key={name} value={name} style={{ background: "#1A1A26" }}>{name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.6)", textTransform: "uppercase" }}>Reverb</span>
+                  <select value={reverb} onChange={e => setReverb(e.target.value)}
+                    style={{ display: "block", width: "100%", background: "rgba(0,0,0,0.3)", border: "none", color: "#fff", padding: "6px 10px", borderRadius: 8, fontSize: 12, marginTop: 4 }}>
+                    {REVERB_PRESETS.map(r => <option key={r} value={r} style={{ background: "#1A1A26" }}>{r}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.6)", textTransform: "uppercase" }}>Sleep Timer</span>
+                  <select value={sleepTimer} onChange={e => setSleepTimer(e.target.value)}
+                    style={{ display: "block", width: "100%", background: "rgba(0,0,0,0.3)", border: "none", color: "#fff", padding: "6px 10px", borderRadius: 8, fontSize: 12, marginTop: 4 }}>
+                    {SLEEP_OPTIONS.map(opt => <option key={opt} value={opt} style={{ background: "#1A1A26" }}>{opt}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, alignItems: "end" }}>
+                {eqValues.map((value, idx) => (
+                  <label key={idx} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                    <input
+                      type="range"
+                      min="-12"
+                      max="12"
+                      value={value}
+                      onChange={e => {
+                        const next = [...eqValues];
+                        next[idx] = Number(e.target.value);
+                        setEqValues(next);
+                      }}
+                      style={{ width: "100%", accentColor }}
+                    />
+                    <span style={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>{value > 0 ? `+${value}` : value}</span>
+                  </label>
+                ))}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <button
+                  onClick={() => setKaraokeMode(mode => !mode)}
+                  style={{
+                    background: karaokeMode ? accentColor : "rgba(0,0,0,0.3)",
+                    border: "none",
+                    borderRadius: 8,
+                    color: "#fff",
+                    cursor: "pointer",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: "8px 10px",
+                  }}
+                >
+                  Karaoke {karaokeMode ? "On" : "Off"}
+                </button>
+                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.6)", textTransform: "uppercase" }}>
+                    Crossfade {crossfade}s
+                  </span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="12"
+                    value={crossfade}
+                    onChange={e => setCrossfade(Number(e.target.value))}
+                    style={{ accentColor }}
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Playback Bar */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center", width: "100%", maxWidth: 600, margin: "0 auto 40px", flexShrink: 0 }}>
+          <div style={{ width: "100%" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "rgba(255,255,255,0.8)", fontSize: 13, marginBottom: 8 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentSong?.title}</div>
+                <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>{currentSong?.artist} · {currentSong?.album}</div>
+              </div>
+              <button onClick={() => toggleLike(currentSong?.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: liked.has(currentSong?.id) ? "#FF6B6B" : "rgba(255,255,255,0.6)" }}>
+                {liked.has(currentSong?.id) ? "♥" : "♡"}
+              </button>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
+              <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 11, fontVariantNumeric: "tabular-nums", width: 32, textAlign: "right" }}>{formatTime(progress)}</span>
+              <input type="range" min={0} max={parseDuration(currentSong?.duration || "0:00")} value={progress}
+                onChange={e => setProgress(Number(e.target.value))} className="range-styled"
+                style={{ flex: 1, height: 4, accentColor: "#fff", cursor: "pointer" }}
+              />
+              <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 11, fontVariantNumeric: "tabular-nums", width: 32 }}>{currentSong?.duration}</span>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 30 }}>
+            <button onClick={() => setShuffle(s => !s)} style={{ background: "none", border: "none", cursor: "pointer", color: shuffle ? "#fff" : "rgba(255,255,255,0.45)", fontSize: 20 }}>⇄</button>
+            <button onClick={skipPrev} style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", fontSize: 24 }}>⏮</button>
+            <button onClick={() => setIsPlaying(p => !p)}
+              style={{
+                width: 64, height: 64, borderRadius: "50%", border: "none", cursor: "pointer",
+                background: "#fff", color: accentColor, fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: "0 10px 30px rgba(0,0,0,0.15)"
+              }}>
+              {isPlaying ? "⏸" : "▶"}
+            </button>
+            <button onClick={skipNext} style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", fontSize: 24 }}>⏭</button>
+            <button onClick={() => setLoop(l => !l)} style={{ background: "none", border: "none", cursor: "pointer", color: loop ? "#fff" : "rgba(255,255,255,0.45)", fontSize: 20 }}>↻</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ─── Render ───────────────────────────────────────────────────────────────
+  return (
+    <div style={{ background: T.bg, minHeight: "100vh" }}>
+      <style>{css}</style>
+      {route === "auth" ? (
+        <AuthScreen />
+      ) : (
+        <Shell>
+          {route === "home" && <HomeView />}
+          {route === "album" && <AlbumView />}
+          {route === "playlist" && <PlaylistView />}
+          {route === "profile" && <ProfileView />}
+          {route === "admin" && <AdminView />}
+        </Shell>
+      )}
+      <Toast message={notification} />
+    </div>
+  );
+}

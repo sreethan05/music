@@ -13,6 +13,7 @@ import songRouter from './routes/songRoutes.js';
 import albumRouter from './routes/albumRoutes.js';
 import saavnRouter from './routes/saavnRoutes.js';
 import authRouter from './routes/authRoutes.js';
+import importRouter from './routes/importRoutes.js';
 import { getAlbums, getSongs, createAlbum, createSong } from './services/dbService.js';
 
 const app = express();
@@ -104,6 +105,7 @@ app.use('/api/song', songRouter);
 app.use('/api/album', albumRouter);
 app.use('/api/saavn', saavnRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/import', importRouter);
 
 app.get('/api/health', (req, res) => res.send("Music Vibe API Working"));
 

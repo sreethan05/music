@@ -3,14 +3,26 @@ import jwt from 'jsonwebtoken';
 import { getUserByEmail, createUser, getUserById } from '../services/dbService.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
-  console.warn("SECURITY WARNING: JWT_SECRET environment variable is not defined in production mode. Using fallback secret!");
+if (!JWT_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    console.error("FATAL SECURITY ERROR: JWT_SECRET environment variable is not defined in production mode! Exiting server...");
+    process.exit(1);
+  }
+  console.warn("WARNING: JWT_SECRET environment variable is not defined. Using development fallback secret!");
 }
 const ACTUAL_JWT_SECRET = JWT_SECRET || 'spotify_clone_secret_token_123';
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
+  .split(',')
+  .map(email => email.trim().toLowerCase())
+  .filter(Boolean);
 
 // Generate Token
 const createToken = (id, role) => {
   return jwt.sign({ id, role }, ACTUAL_JWT_SECRET, { expiresIn: '7d' });
+};
+
+const getRoleForEmail = (email) => {
+  return ADMIN_EMAILS.includes(email.trim().toLowerCase()) ? 'admin' : 'user';
 };
 
 // Register User
@@ -42,8 +54,7 @@ export const registerUser = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // If email contains "admin@", make them admin
-    const role = email.toLowerCase().includes('admin@') ? 'admin' : 'user';
+    const role = getRoleForEmail(email);
 
     const newUser = await createUser({
       name,
@@ -105,7 +116,7 @@ export const loginUser = async (req, res) => {
 
   } catch (error) {
     console.error("Login error:", error);
-    res.status(550).json({ success: false, message: 'Internal server error during login.' });
+    res.status(500).json({ success: false, message: 'Internal server error during login.' });
   }
 };
 
