@@ -7,7 +7,7 @@
   --color-spotify-light: var(--bg-secondary);
   --color-spotify-panel: var(--glass-bg);
   
-  /* Dynamic Backgrounds */
+  /* Dynamic Backgrounds  */
   --color-theme-bg: var(--bg-primary);
   --color-theme-card: var(--bg-card);
   --color-theme-card-hover: var(--bg-card-hover);
